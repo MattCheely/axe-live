@@ -1,0 +1,29 @@
+{
+  "name": "axe-live",
+  "version": "0.0.1",
+  "description": "Show a11y audit results inline on pages",
+  "main": "dist/axe-live.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "parcel test/*.html",
+    "build": "parcel build src/axe-live.js"
+  },
+  "keywords": [
+    "axe",
+    "a11y",
+    "accessibility"
+  ],
+  "author": "Matt Cheely",
+  "repository": "https://github.com/MattCheely/axe-live.git",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "axe-core": "^3.3.2"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.6.0",
+    "elm-doc-preview": "^3.0.1",
+    "elm-hot": "^1.1.2",
+    "node-elm-compiler": "^5.0.4",
+    "parcel": "^1.12.3"
+  }
+}
