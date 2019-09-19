@@ -2,11 +2,12 @@
   "name": "axe-live",
   "version": "0.0.2",
   "description": "Show a11y audit results inline on pages",
-  "main": "dist/axe-live.js",
+  "main": "src/axe-live.js",
+  "browser": "dist/axe-live.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "parcel test/*.html",
-    "build": "parcel build src/axe-live.js"
+    "start": "parcel test/index.html",
+    "build": "webpack"
   },
   "keywords": [
     "axe",
@@ -21,9 +22,15 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.6.0",
+    "elm": "^0.19.0-no-deps",
     "elm-doc-preview": "^3.0.1",
     "elm-hot": "^1.1.2",
-    "node-elm-compiler": "^5.0.4",
-    "parcel": "^1.12.3"
-  }
+    "elm-webpack-loader": "^6.0.0",
+    "parcel": "^1.12.3",
+    "webpack": "^4.40.2",
+    "webpack-cli": "^3.3.9"
+  },
+  "browserslist": [
+     "last 1 Chrome versions"
+  ]
 }

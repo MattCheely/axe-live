@@ -1,13 +1,8 @@
 import axe from "axe-core";
 import { Elm } from "./ErrorPanel.elm";
-
-const STYLES_ID = "axe-live-styles";
-const VIOLATION_HIGHLIGHT_STYLE = `
-  {outline: rgba(255, 0, 0, 0.6) dashed 0.3rem !important;}
-`;
-const VIOLATION_SELECTED_STYLE = `
-  {outline-style: solid !important; outline-width: 0.6rem !important}
-`;
+import * as Decorator from "./decorator.js";
+import * as Frame from "./frame.js";
+import * as EventBlocker from "./event-blocker.js";
 
 export function run(...axeArgs) {
   axe
@@ -15,6 +10,8 @@ export function run(...axeArgs) {
     .then(violationsByNode)
     .then(showViolations);
 }
+
+window.axeLive = run;
 
 function violationsByNode(axeResults) {
   return axeResults.violations.reduce(collectNodes, {});
@@ -30,91 +27,59 @@ function collectNodes(byNode, violation) {
   return byNode;
 }
 
-function showViolations(violations) {
+async function showViolations(violations) {
   const allSelectors = Object.keys(violations);
-  const elementSelectors = allSelectors.filter(selector => {
-    return !(
-      document.body.matches(selector) ||
-      document.body.parentElement.matches(selector)
-    );
-  });
+  const elementSelectors = allSelectors.filter(notBodyOrHtml);
+  const panels = {};
 
   if (allSelectors.length > 0) {
-    const styleSheet = ensureStyleSheet();
-    const selector = elementSelectors.join(",");
-    highlightViolations(styleSheet, selector);
-    const panelApp = renderErrorPanel(violations);
-    panelApp.ports.requestSelection.subscribe(toSelect => {
-      selectElement(toSelect, styleSheet, panelApp, elementSelectors);
+    Decorator.markViolations(elementSelectors);
+
+    panels.frame = await renderErrorPanel(violations);
+    panels.frame.ports.requestSelection.subscribe(toSelect => {
+      selectElement(toSelect, panels, elementSelectors);
     });
-    interceptEvents(elementSelectors, styleSheet, panelApp);
+    panels.frame.ports.requestPopOut.subscribe(async panelState => {
+      const target = await Frame.getWindow();
+      panels.window = Elm.ErrorPanel.init({
+        node: target,
+        flags: { ...panelState, externalPanel: true }
+      });
+      panels.window.ports.requestSelection.subscribe(toSelect => {
+        selectElement(toSelect, panels, elementSelectors);
+      });
+      Decorator.hideFrame();
+    });
+
+    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
+      selectElement(interceptedSelector, panels, elementSelectors);
+    });
   }
 }
 
-function interceptEvents(elementSelectors, styleSheet, panelApp) {
-  const handler = eventHandler(elementSelectors, styleSheet, panelApp);
-  document.addEventListener("click", handler, { capture: true });
-  document.addEventListener("focus", handler, { capture: true });
-  document.addEventListener("keydown", handler, { capture: true });
+function notBodyOrHtml(selector) {
+  return !(
+    document.body.matches(selector) ||
+    document.body.parentElement.matches(selector)
+  );
 }
 
-function eventHandler(elementSelectors, styleSheet, panelApp) {
-  return event => {
-    let checkElement = event.target;
-    let matchedSelector = null;
-    while (
-      !matchedSelector &&
-      checkElement !== document &&
-      checkElement.id !== "axe-live-panel"
-    ) {
-      matchedSelector = matchSelector(elementSelectors, checkElement);
-      checkElement = checkElement.parentElement;
-    }
-    if (matchedSelector) {
-      event.preventDefault();
-      event.stopPropagation();
-      selectElement(matchedSelector, styleSheet, panelApp, elementSelectors);
-    }
-  };
-}
-
-function selectElement(selector, styleSheet, panelApp, styleSelectors) {
-  if (styleSelectors.includes(selector) || !selector) {
-    styleSheet.sheet.rules[1].selectorText = selector || STYLES_ID;
+function selectElement(selector, panels, selectableElements) {
+  if (!selector) {
+    Decorator.clearSelected();
+  } else if (selectableElements.includes(selector)) {
+    Decorator.highlightSelected(selector);
   }
-  panelApp.ports.selectedElement.send(selector);
+  panels.frame.ports.selectedElement.send(selector);
+  if (panels.window) {
+    panels.window.ports.selectedElement.send(selector);
+  }
 }
 
-function matchSelector(selectors, element) {
-  return selectors.find(selector => {
-    return element.matches(selector);
+async function renderErrorPanel(violations) {
+  const panel = await Frame.getFrame();
+  return Elm.ErrorPanel.init({
+    node: panel,
+    flags: { selectedElement: null, problems: violations }
   });
-}
-
-function renderErrorPanel(violations) {
-  const panel = ensurePanelElement();
-  return Elm.ErrorPanel.init({ node: panel, flags: violations });
-}
-
-function ensurePanelElement() {
-  const panel = document.createElement("div");
-  document.body.appendChild(panel);
-  return panel;
-}
-
-function highlightViolations(styleSheet, selector) {
-  styleSheet.sheet.rules[0].selectorText = selector;
-}
-
-function ensureStyleSheet() {
-  let sheet = document.getElementById(STYLES_ID);
-  if (!sheet) {
-    sheet = document.head.appendChild(document.createElement("style"));
-    sheet.id = STYLES_ID;
-    // rule 1
-    sheet.sheet.insertRule(`#axe-live-styles ${VIOLATION_SELECTED_STYLE}`);
-    // rule 0
-    sheet.sheet.insertRule(`#axe-live-styles ${VIOLATION_HIGHLIGHT_STYLE}`);
-  }
-  return sheet;
 }

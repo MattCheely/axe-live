@@ -13,12 +13,14 @@ import Accessibility.Styled as Html
         , text
         , toUnstyled
         )
+import Accessibility.Styled.Style exposing (invisible)
 import Browser
 import Css exposing (..)
 import Dict exposing (Dict)
 import Html.Styled.Attributes exposing (css, href, id, target)
 import Html.Styled.Events exposing (onClick)
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
+import Json.Encode as Encode
 
 
 
@@ -28,6 +30,7 @@ import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
 type alias Model =
     { problems : Dict String (List Violation)
     , selectedElement : Maybe String
+    , externalPanel : Bool
     }
 
 
@@ -41,19 +44,32 @@ type alias Violation =
 init : Value -> ( Model, Cmd Msg )
 init flags =
     case decodeValue modelDecoder flags of
-        Ok problems ->
-            ( { problems = problems
+        Ok model ->
+            ( model, Cmd.none )
+
+        Err err ->
+            ( { problems = Dict.empty
               , selectedElement = Nothing
+              , externalPanel = False
               }
             , Cmd.none
             )
 
-        Err err ->
-            ( { problems = Dict.empty, selectedElement = Nothing }, Cmd.none )
 
-
-modelDecoder : Decoder (Dict String (List Violation))
+modelDecoder : Decoder Model
 modelDecoder =
+    Decode.map3 Model
+        (Decode.field "problems" problemsDecoder)
+        (Decode.field "selectedElement" (Decode.nullable Decode.string))
+        (Decode.oneOf
+            [ Decode.field "externalPanel" Decode.bool
+            , Decode.succeed False
+            ]
+        )
+
+
+problemsDecoder : Decoder (Dict String (List Violation))
+problemsDecoder =
     Decode.dict
         (Decode.list
             (Decode.map3 Violation
@@ -64,6 +80,26 @@ modelDecoder =
         )
 
 
+encodeModel : Model -> Value
+encodeModel model =
+    Encode.object
+        [ ( "selectedElement"
+          , Maybe.map Encode.string model.selectedElement
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "problems", Encode.dict identity (Encode.list encodeViolation) model.problems )
+        ]
+
+
+encodeViolation : Violation -> Value
+encodeViolation violation =
+    Encode.object
+        [ ( "help", Encode.string violation.help )
+        , ( "helpUrl", Encode.string violation.helpUrl )
+        , ( "failureSummary", Encode.string violation.failureSummary )
+        ]
+
+
 
 -- MSG
 
@@ -72,6 +108,7 @@ type Msg
     = SelectedElement String
     | RequestSelection String
     | UnselectElement
+    | PopOut
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -86,14 +123,21 @@ update msg model =
         UnselectElement ->
             ( model, requestSelection "" )
 
+        PopOut ->
+            ( model, popToWindow model )
+
 
 
 -- VIEW
 
 
+linkHex =
+    "0077c8"
+
+
 colors =
     { text = rgb 255 255 255
-    , link = hex "0077c8"
+    , link = hex linkHex
     }
 
 
@@ -128,9 +172,7 @@ elementListStyle =
 
 headerStyle =
     css
-        [ backgroundColor transparent
-        , color colors.text
-        , fontSize (px 24)
+        [ fontSize (px 24)
         ]
 
 
@@ -140,16 +182,17 @@ view model =
         div
             [ id "axe-live-panel"
             , css
-                [ position fixed
-                , right (vw 10)
-                , bottom (vh 0)
-                , left (vw 10)
-                , maxHeight (vh 90)
+                [ position absolute
+                , top (px 0)
+                , left (px 0)
+                , right (px 0)
+                , bottom (px 0)
                 , backgroundColor (rgba 0 0 0 0.85)
                 , color colors.text
                 , padding (px 20)
                 , overflow auto
                 , zIndex (int 20000)
+                , fontFamily sansSerif
                 ]
             ]
             [ case
@@ -165,7 +208,34 @@ view model =
 
                 Nothing ->
                     errorElementListing model.problems
+            , popOutIcon model.externalPanel
             ]
+
+    else
+        text ""
+
+
+popOutIcon : Bool -> Html Msg
+popOutIcon isExternal =
+    if not isExternal then
+        button
+            [ css
+                [ position absolute
+                , top (px 20)
+                , right (px 20)
+                , height (px 20)
+                , width (px 20)
+                , backgroundColor transparent
+                , backgroundImage (url externalLink)
+                , backgroundSize (pct 100)
+                , color colors.link
+                , borderStyle none
+                , padding (px 0)
+                , cursor pointer
+                ]
+            , onClick PopOut
+            ]
+            [ span invisible [ text "Open in external window" ] ]
 
     else
         text ""
@@ -237,11 +307,26 @@ violationSummary violation =
         ]
 
 
+{-| Iconic externalLink SVG - licencse held by Matt Cheely
+-}
+externalLink : String
+externalLink =
+    "\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' version='1.1' width='32' height='32' data-icon='external-link' viewBox='0 0 32 32'%3E%3Cpath fill='%23" ++ linkHex ++ "' d='M32 0l-8 1 2.438 2.438-9.5 9.5-1.063 1.063 2.125 2.125 1.063-1.063 9.5-9.5 2.438 2.438 1-8zm-30 3c-1.088 0-2 .912-2 2v25c0 1.088.912 2 2 2h25c1.088 0 2-.912 2-2v-15h-3v14h-23v-23h15v-3h-16z' /%3E%3C/svg%3E\""
+
+
 
 -- PORTS
 
 
 port requestSelection : String -> Cmd msg
+
+
+port requestPopOut : Value -> Cmd msg
+
+
+popToWindow : Model -> Cmd msg
+popToWindow model =
+    requestPopOut (encodeModel model)
 
 
 port selectedElement : (String -> msg) -> Sub msg
