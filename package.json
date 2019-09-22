@@ -1,6 +1,6 @@
 {
   "name": "axe-live",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Show a11y audit results inline on pages",
   "main": "src/axe-live.js",
   "browser": "dist/axe-live.js",
@@ -31,6 +31,6 @@
     "webpack-cli": "^3.3.9"
   },
   "browserslist": [
-     "last 1 Chrome versions"
+    "last 1 Chrome versions"
   ]
 }
