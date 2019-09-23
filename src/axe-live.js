@@ -1,5 +1,4 @@
 import axe from "axe-core";
-import { Elm } from "./ErrorPanel.elm";
 import * as Decorator from "./decorator.js";
 import * as Frame from "./frame.js";
 import * as EventBlocker from "./event-blocker.js";
@@ -35,16 +34,15 @@ async function showViolations(violations) {
   if (allSelectors.length > 0) {
     Decorator.markViolations(elementSelectors);
 
-    panels.frame = await renderErrorPanel(violations);
+    panels.frame = await Frame.getFramePanel({
+      selectedElement: null,
+      problems: violations
+    });
     panels.frame.ports.requestSelection.subscribe(toSelect => {
       selectElement(toSelect, panels, elementSelectors);
     });
     panels.frame.ports.requestPopOut.subscribe(async panelState => {
-      const target = await Frame.getWindow();
-      panels.window = Elm.ErrorPanel.init({
-        node: target,
-        flags: { ...panelState, externalPanel: true }
-      });
+      panels.window = await Frame.getWindowPanel(panelState);
       panels.window.ports.requestSelection.subscribe(toSelect => {
         selectElement(toSelect, panels, elementSelectors);
       });
@@ -74,12 +72,4 @@ function selectElement(selector, panels, selectableElements) {
   if (panels.window) {
     panels.window.ports.selectedElement.send(selector);
   }
-}
-
-async function renderErrorPanel(violations) {
-  const panel = await Frame.getFrame();
-  return Elm.ErrorPanel.init({
-    node: panel,
-    flags: { selectedElement: null, problems: violations }
-  });
 }
