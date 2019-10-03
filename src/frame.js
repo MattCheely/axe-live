@@ -32,6 +32,7 @@ export function getWindowPanel(panelState) {
     WINDOW_ID,
     "menubar=no,toolbar=no,location=no,personalbar=no,status=no"
   );
+  Decorator.hideFrame();
   return setupWindow(win, panelState);
 }
 

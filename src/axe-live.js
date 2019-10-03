@@ -2,57 +2,60 @@ import axe from "axe-core";
 import * as Decorator from "./decorator.js";
 import * as Frame from "./frame.js";
 import * as EventBlocker from "./event-blocker.js";
+import * as Watcher from "./watcher.js";
 
 export function run(...axeArgs) {
-  axe
-    .run(...axeArgs)
-    .then(violationsByNode)
-    .then(showViolations);
+  axe.run(...axeArgs).then(showViolations);
 }
 
-window.axeLive = run;
-
-function violationsByNode(axeResults) {
-  return axeResults.violations.reduce(collectNodes, {});
-}
-
-function collectNodes(byNode, violation) {
-  violation.nodes.forEach(node => {
-    const selector = node.target[0];
-    const failureSummary = node.failureSummary;
-    byNode[selector] = byNode[selector] || [];
-    byNode[selector].push({ ...violation, failureSummary });
+export function watch(...axeArgs) {
+  Watcher.watch((...args) => {
+    console.log("CHANGED", args);
   });
-  return byNode;
 }
 
-async function showViolations(violations) {
-  const allSelectors = Object.keys(violations);
-  const elementSelectors = allSelectors.filter(notBodyOrHtml);
+async function showViolations(axeResult) {
+  const violations = axeResult.violations;
   const panels = {};
 
-  if (allSelectors.length > 0) {
-    Decorator.markViolations(elementSelectors);
-
+  if (violations.length > 0) {
     panels.frame = await Frame.getFramePanel({
       selectedElement: null,
       problems: violations
     });
-    panels.frame.ports.requestSelection.subscribe(toSelect => {
-      selectElement(toSelect, panels, elementSelectors);
-    });
-    panels.frame.ports.requestPopOut.subscribe(async panelState => {
-      panels.window = await Frame.getWindowPanel(panelState);
-      panels.window.ports.requestSelection.subscribe(toSelect => {
-        selectElement(toSelect, panels, elementSelectors);
+
+    panels.frame.ports.flagErrorElements.subscribe(selectors => {
+      const elementSelectors = filterSelectors(selectors);
+      Decorator.markViolations(elementSelectors);
+      EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
+        selectElement(interceptedSelector, panels);
       });
-      Decorator.hideFrame();
     });
 
-    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
-      selectElement(interceptedSelector, panels, elementSelectors);
+    panels.frame.ports.selectElement.subscribe(toSelect => {
+      highlightSelection(toSelect);
+    });
+
+    panels.frame.ports.requestPopOut.subscribe(async panelState => {
+      panels.window = await Frame.getWindowPanel(panelState);
+      panels.window.ports.selectElement.subscribe(toSelect => {
+        highlightSelection(toSelect);
+        panels.frame.ports.elementSelected.send(toSelect);
+      });
     });
   }
+}
+
+function highlightSelection(toSelect) {
+  if (toSelect) {
+    Decorator.highlightSelected(toSelect);
+  } else {
+    Decorator.clearSelected();
+  }
+}
+
+function filterSelectors(selectors) {
+  return selectors.filter(notBodyOrHtml);
 }
 
 function notBodyOrHtml(selector) {
@@ -62,14 +65,11 @@ function notBodyOrHtml(selector) {
   );
 }
 
-function selectElement(selector, panels, selectableElements) {
-  if (!selector) {
-    Decorator.clearSelected();
-  } else if (selectableElements.includes(selector)) {
-    Decorator.highlightSelected(selector);
-  }
-  panels.frame.ports.selectedElement.send(selector);
+function selectElement(selector, panels) {
+  highlightSelection(selector);
   if (panels.window) {
-    panels.window.ports.selectedElement.send(selector);
+    panels.window.ports.elementSelected.send(selector);
+  } else {
+    panels.frame.ports.elementSelected.send(selector);
   }
 }

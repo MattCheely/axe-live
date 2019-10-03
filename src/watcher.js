@@ -1,8 +1,9 @@
 const promise = null;
 const runAgain = false;
-const observer = new MutationObserver(runIt);
 
-function watch(handler) {
+export function watch(handler) {
+  const observer = new MutationObserver(handler);
+  console.log("Observing", document.body);
   observer.observe(document.body, {
     attributes: true,
     childList: true,

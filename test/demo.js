@@ -1,3 +1,5 @@
-import { run } from "../src/axe-live.js";
+import * as AxeLive from "../src/axe-live.js";
 
-run();
+AxeLive.run();
+
+window.AxeLive = AxeLive;

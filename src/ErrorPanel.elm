@@ -14,6 +14,7 @@ import Accessibility.Styled as Html
         , toUnstyled
         )
 import Accessibility.Styled.Style exposing (invisible)
+import Axe exposing (ElementProblem, PageProblems, problemsDecoder)
 import Browser
 import Css exposing (..)
 import Dict exposing (Dict)
@@ -21,6 +22,7 @@ import Html.Styled.Attributes exposing (css, href, id, target)
 import Html.Styled.Events exposing (onClick)
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
 import Json.Encode as Encode
+import Ports
 
 
 
@@ -28,16 +30,9 @@ import Json.Encode as Encode
 
 
 type alias Model =
-    { problems : Dict String (List Violation)
+    { problems : PageProblems
     , selectedElement : Maybe String
     , externalPanel : Bool
-    }
-
-
-type alias Violation =
-    { help : String
-    , helpUrl : String
-    , failureSummary : String
     }
 
 
@@ -45,7 +40,7 @@ init : Value -> ( Model, Cmd Msg )
 init flags =
     case decodeValue modelDecoder flags of
         Ok model ->
-            ( model, Cmd.none )
+            ( model, flagProblems model.problems )
 
         Err err ->
             ( { problems = Dict.empty
@@ -68,18 +63,6 @@ modelDecoder =
         )
 
 
-problemsDecoder : Decoder (Dict String (List Violation))
-problemsDecoder =
-    Decode.dict
-        (Decode.list
-            (Decode.map3 Violation
-                (Decode.field "help" Decode.string)
-                (Decode.field "helpUrl" Decode.string)
-                (Decode.field "failureSummary" Decode.string)
-            )
-        )
-
-
 encodeModel : Model -> Value
 encodeModel model =
     Encode.object
@@ -87,16 +70,8 @@ encodeModel model =
           , Maybe.map Encode.string model.selectedElement
                 |> Maybe.withDefault Encode.null
           )
-        , ( "problems", Encode.dict identity (Encode.list encodeViolation) model.problems )
-        ]
-
-
-encodeViolation : Violation -> Value
-encodeViolation violation =
-    Encode.object
-        [ ( "help", Encode.string violation.help )
-        , ( "helpUrl", Encode.string violation.helpUrl )
-        , ( "failureSummary", Encode.string violation.failureSummary )
+        , ( "problems", Axe.encodeProblems model.problems )
+        , ( "externalPanel", Encode.bool model.externalPanel )
         ]
 
 
@@ -105,8 +80,7 @@ encodeViolation violation =
 
 
 type Msg
-    = SelectedElement String
-    | RequestSelection String
+    = ElementSelected String
     | UnselectElement
     | PopOut
 
@@ -114,17 +88,20 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SelectedElement selector ->
-            ( { model | selectedElement = Just selector }, Cmd.none )
-
-        RequestSelection selector ->
-            ( model, requestSelection selector )
+        ElementSelected selector ->
+            ( { model | selectedElement = Just selector }
+            , Ports.selectElement selector
+            )
 
         UnselectElement ->
-            ( model, requestSelection "" )
+            ( { model | selectedElement = Nothing }
+            , Ports.selectElement ""
+            )
 
         PopOut ->
-            ( model, popToWindow model )
+            ( model
+            , popToWindow { model | externalPanel = True }
+            )
 
 
 
@@ -241,7 +218,7 @@ popOutIcon isExternal =
         text ""
 
 
-errorElementListing : Dict String (List Violation) -> Html Msg
+errorElementListing : PageProblems -> Html Msg
 errorElementListing elements =
     let
         count =
@@ -260,18 +237,18 @@ errorElementListing elements =
         ]
 
 
-elementSummary : ( String, List Violation ) -> Html Msg
+elementSummary : ( String, List ElementProblem ) -> Html Msg
 elementSummary ( selector, violations ) =
     div []
         [ button
             [ elementListStyle
-            , onClick (RequestSelection selector)
+            , onClick (ElementSelected selector)
             ]
             [ text selector ]
         ]
 
 
-describeViolations : String -> List Violation -> Html Msg
+describeViolations : String -> List ElementProblem -> Html Msg
 describeViolations selector violations =
     div []
         [ button [ linkStyle, onClick UnselectElement ] [ text "< Back" ]
@@ -280,7 +257,7 @@ describeViolations selector violations =
         ]
 
 
-violationSummary : Violation -> Html Msg
+violationSummary : ElementProblem -> Html Msg
 violationSummary violation =
     details
         [ css
@@ -318,18 +295,16 @@ externalLink =
 -- PORTS
 
 
-port requestSelection : String -> Cmd msg
-
-
-port requestPopOut : Value -> Cmd msg
-
-
 popToWindow : Model -> Cmd msg
 popToWindow model =
-    requestPopOut (encodeModel model)
+    Ports.requestPopOut (encodeModel model)
 
 
-port selectedElement : (String -> msg) -> Sub msg
+flagProblems : PageProblems -> Cmd msg
+flagProblems problems =
+    Dict.keys problems
+        |> Encode.list Encode.string
+        |> Ports.flagErrorElements
 
 
 
@@ -341,5 +316,5 @@ main =
         { init = init
         , update = update
         , view = view >> toUnstyled
-        , subscriptions = always (selectedElement SelectedElement)
+        , subscriptions = always (Ports.elementSelected ElementSelected)
         }
