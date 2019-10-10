@@ -29,31 +29,32 @@ import Ports
 -- MODEL
 
 
-type alias Model =
+type alias A11yReport =
     { problems : PageProblems
     , selectedElement : Maybe String
     , externalPanel : Bool
     }
 
 
+type alias Model =
+    Result String A11yReport
+
+
 init : Value -> ( Model, Cmd Msg )
 init flags =
     case decodeValue modelDecoder flags of
         Ok model ->
-            ( model, flagProblems model.problems )
+            ( Ok model, flagProblems model.problems )
 
         Err err ->
-            ( { problems = Dict.empty
-              , selectedElement = Nothing
-              , externalPanel = False
-              }
+            ( Err ("I couldn't understand the output from axe. " ++ Decode.errorToString err)
             , Cmd.none
             )
 
 
-modelDecoder : Decoder Model
+modelDecoder : Decoder A11yReport
 modelDecoder =
-    Decode.map3 Model
+    Decode.map3 A11yReport
         (Decode.field "problems" problemsDecoder)
         (Decode.field "selectedElement" (Decode.nullable Decode.string))
         (Decode.oneOf
@@ -63,7 +64,7 @@ modelDecoder =
         )
 
 
-encodeModel : Model -> Value
+encodeModel : A11yReport -> Value
 encodeModel model =
     Encode.object
         [ ( "selectedElement"
@@ -75,6 +76,20 @@ encodeModel model =
         ]
 
 
+withProblems : PageProblems -> A11yReport -> A11yReport
+withProblems problems model =
+    let
+        newSelection =
+            case Maybe.andThen (\selected -> Dict.get selected problems) model.selectedElement of
+                Just _ ->
+                    model.selectedElement
+
+                Nothing ->
+                    Nothing
+    in
+    { model | problems = problems, selectedElement = newSelection }
+
+
 
 -- MSG
 
@@ -83,25 +98,68 @@ type Msg
     = ElementSelected String
     | UnselectElement
     | PopOut
+    | DomChanged (List MutationRecord)
+    | GotViolations PageProblems
+    | DisplayError String
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+type alias MutationRecord =
+    { target : Value
+    }
+
+
+updateWrapper : Msg -> Model -> ( Model, Cmd Msg )
+updateWrapper msg model =
+    case Result.andThen (update msg) model of
+        Ok ( report, cmd ) ->
+            ( Ok report, cmd )
+
+        Err errMsg ->
+            ( Err errMsg, Cmd.none )
+
+
+update : Msg -> A11yReport -> Result String ( A11yReport, Cmd Msg )
 update msg model =
     case msg of
         ElementSelected selector ->
-            ( { model | selectedElement = Just selector }
-            , Ports.selectElement selector
-            )
+            Ok
+                ( { model | selectedElement = Just selector }
+                , updateSelected (Just selector)
+                )
 
         UnselectElement ->
-            ( { model | selectedElement = Nothing }
-            , Ports.selectElement ""
-            )
+            Ok
+                ( { model | selectedElement = Nothing }
+                , updateSelected Nothing
+                )
 
         PopOut ->
-            ( model
-            , popToWindow { model | externalPanel = True }
-            )
+            Ok
+                ( model
+                , popToWindow { model | externalPanel = True }
+                )
+
+        DomChanged changes ->
+            Ok
+                ( model
+                , a11yCheck changes model.problems
+                )
+
+        GotViolations problems ->
+            let
+                newModel =
+                    model |> withProblems problems
+            in
+            Ok
+                ( newModel
+                , Cmd.batch
+                    [ flagProblems newModel.problems
+                    , updateSelected newModel.selectedElement
+                    ]
+                )
+
+        DisplayError error ->
+            Err error
 
 
 
@@ -155,41 +213,59 @@ headerStyle =
 
 view : Model -> Html Msg
 view model =
-    if Dict.size model.problems /= 0 then
-        div
-            [ id "axe-live-panel"
-            , css
-                [ position absolute
-                , top (px 0)
-                , left (px 0)
-                , right (px 0)
-                , bottom (px 0)
-                , backgroundColor (rgba 0 0 0 0.85)
-                , color colors.text
-                , padding (px 20)
-                , overflow auto
-                , zIndex (int 20000)
-                , fontFamily sansSerif
+    div
+        [ id "axe-live-panel"
+        , css
+            [ position absolute
+            , top (px 0)
+            , left (px 0)
+            , right (px 0)
+            , bottom (px 0)
+            , backgroundColor (rgba 0 0 0 0.85)
+            , color colors.text
+            , padding (px 20)
+            , overflow auto
+            , zIndex (int 20000)
+            , fontFamily sansSerif
+            ]
+        ]
+        (case model of
+            Ok report ->
+                reportView report
+
+            Err errMsg ->
+                [ h2 [ headerStyle ] [ text "Oops, something went wrong" ]
+                , div [ css [ color (rgb 255 0 0) ] ] [ text errMsg ]
+                , div [ css [ marginTop (px 20) ] ]
+                    [ text "This is probably a bug in axe-live. Please check the issues on "
+                    , a [ linkStyle, href "https://github.com/MattCheely/axe-live/issues" ] [ text "GitHub" ]
+                    , text " to see if someone has already opened an issue. If not, please open a new one."
+                    ]
                 ]
-            ]
-            [ case
-                model.selectedElement
-                    |> Maybe.andThen
-                        (\elem ->
-                            Dict.get elem model.problems
-                                |> Maybe.map (\violations -> ( elem, violations ))
-                        )
-              of
-                Just ( selector, violations ) ->
-                    describeViolations selector violations
+        )
 
-                Nothing ->
-                    errorElementListing model.problems
-            , popOutIcon model.externalPanel
-            ]
 
-    else
-        text ""
+reportView : A11yReport -> List (Html Msg)
+reportView model =
+    [ if Dict.size model.problems /= 0 then
+        case
+            model.selectedElement
+                |> Maybe.andThen
+                    (\elem ->
+                        Dict.get elem model.problems
+                            |> Maybe.map (\violations -> ( elem, violations ))
+                    )
+        of
+            Just ( selector, violations ) ->
+                describeViolations selector violations
+
+            Nothing ->
+                errorElementListing model.problems
+
+      else
+        h2 [] [ text "No problems found. Nice work!" ]
+    , popOutIcon model.externalPanel
+    ]
 
 
 popOutIcon : Bool -> Html Msg
@@ -295,7 +371,7 @@ externalLink =
 -- PORTS
 
 
-popToWindow : Model -> Cmd msg
+popToWindow : A11yReport -> Cmd msg
 popToWindow model =
     Ports.requestPopOut (encodeModel model)
 
@@ -307,6 +383,53 @@ flagProblems problems =
         |> Ports.flagErrorElements
 
 
+updateSelected : Maybe String -> Cmd msg
+updateSelected selectedElement =
+    Maybe.withDefault "" selectedElement
+        |> Ports.selectElement
+
+
+a11yCheck : List MutationRecord -> PageProblems -> Cmd msg
+a11yCheck mutations problems =
+    Encode.object
+        [ ( "elements", Encode.list identity (List.map .target mutations) )
+        , ( "selectors", Encode.list Encode.string (Dict.keys problems) )
+        ]
+        |> Ports.checkElements
+
+
+handleDomChanges : Value -> Msg
+handleDomChanges mutationInfo =
+    case Decode.decodeValue (Decode.list mutationRecordDecoder) mutationInfo of
+        Ok mutationRecords ->
+            DomChanged mutationRecords
+
+        Err decodeError ->
+            DisplayError
+                ("I could not parse a DOM mutation event. "
+                    ++ Decode.errorToString decodeError
+                )
+
+
+handleViolationReport : Value -> Msg
+handleViolationReport violationJson =
+    case decodeValue problemsDecoder violationJson of
+        Ok violations ->
+            GotViolations violations
+
+        Err err ->
+            DisplayError
+                ("I couldn't understand the output from axe. "
+                    ++ Decode.errorToString err
+                )
+
+
+mutationRecordDecoder : Decoder MutationRecord
+mutationRecordDecoder =
+    Decode.map MutationRecord
+        (Decode.field "target" Decode.value)
+
+
 
 -- MAIN
 
@@ -314,7 +437,14 @@ flagProblems problems =
 main =
     Browser.element
         { init = init
-        , update = update
+        , update = updateWrapper
         , view = view >> toUnstyled
-        , subscriptions = always (Ports.elementSelected ElementSelected)
+        , subscriptions =
+            always
+                (Sub.batch
+                    [ Ports.elementSelected ElementSelected
+                    , Ports.notifyChanges handleDomChanges
+                    , Ports.violations handleViolationReport
+                    ]
+                )
         }

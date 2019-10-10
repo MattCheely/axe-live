@@ -4,46 +4,73 @@ import * as Frame from "./frame.js";
 import * as EventBlocker from "./event-blocker.js";
 import * as Watcher from "./watcher.js";
 
-export function run(...axeArgs) {
-  axe.run(...axeArgs).then(showViolations);
+export async function run(context = document, options) {
+  const result = await runAxe(context, options);
+  await showViolations(result);
 }
 
-export function watch(...axeArgs) {
-  Watcher.watch((...args) => {
-    console.log("CHANGED", args);
+export async function watch(context = document, options) {
+  const result = await runAxe(context, options);
+  const panels = await showViolations(result);
+
+  Watcher.watch(context, async mutations => {
+    panels.frame.ports.notifyChanges.send(mutations);
   });
+}
+
+async function runAxe(context, options = {}) {
+  //TODO: try "no-passes" reporter
+  let ourOpts = { ...options, reporter: "v1" };
+  return await axe.run(context, ourOpts);
 }
 
 async function showViolations(axeResult) {
   const violations = axeResult.violations;
   const panels = {};
 
-  if (violations.length > 0) {
-    panels.frame = await Frame.getFramePanel({
-      selectedElement: null,
-      problems: violations
+  panels.frame = await Frame.getFramePanel({
+    selectedElement: null,
+    problems: violations
+  });
+
+  panels.frame.ports.flagErrorElements.subscribe(selectors => {
+    if (selectors.length === 0) {
+      Decorator.hideFrame();
+    } else {
+      Decorator.showFrame();
+    }
+    const elementSelectors = filterSelectors(selectors);
+    Decorator.markViolations(elementSelectors);
+    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
+      selectElement(interceptedSelector, panels);
+    });
+  });
+
+  panels.frame.ports.selectElement.subscribe(toSelect => {
+    highlightSelection(toSelect);
+  });
+
+  panels.frame.ports.checkElements.subscribe(async toCheck => {
+    console.log(toCheck);
+    let elements = toCheck.elements || [];
+    let selected = document.querySelectorAll(toCheck.selectors.join(","));
+    selected.forEach(element => {
+      elements.push(element);
     });
 
-    panels.frame.ports.flagErrorElements.subscribe(selectors => {
-      const elementSelectors = filterSelectors(selectors);
-      Decorator.markViolations(elementSelectors);
-      EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
-        selectElement(interceptedSelector, panels);
-      });
-    });
+    let results = await runAxe(elements);
+    showResults(panels, results);
+  });
 
-    panels.frame.ports.selectElement.subscribe(toSelect => {
+  panels.frame.ports.requestPopOut.subscribe(async panelState => {
+    panels.window = await Frame.getWindowPanel(panelState);
+    panels.window.ports.selectElement.subscribe(toSelect => {
       highlightSelection(toSelect);
+      panels.frame.ports.elementSelected.send(toSelect);
     });
+  });
 
-    panels.frame.ports.requestPopOut.subscribe(async panelState => {
-      panels.window = await Frame.getWindowPanel(panelState);
-      panels.window.ports.selectElement.subscribe(toSelect => {
-        highlightSelection(toSelect);
-        panels.frame.ports.elementSelected.send(toSelect);
-      });
-    });
-  }
+  return panels;
 }
 
 function highlightSelection(toSelect) {
@@ -72,4 +99,11 @@ function selectElement(selector, panels) {
   } else {
     panels.frame.ports.elementSelected.send(selector);
   }
+}
+
+function showResults(panels, results) {
+  if (panels.window) {
+    panels.window.ports.violations.send(results.violations);
+  }
+  panels.frame.ports.violations.send(results.violations);
 }

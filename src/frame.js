@@ -32,16 +32,17 @@ export function getWindowPanel(panelState) {
     WINDOW_ID,
     "menubar=no,toolbar=no,location=no,personalbar=no,status=no"
   );
-  Decorator.hideFrame();
-  return setupWindow(win, panelState);
-}
 
-function setupWindow(win, panelState) {
+  Decorator.hideFrame();
   // when the window closes, show the frame panel
   win.onbeforeunload = () => {
     Decorator.showFrame();
   };
 
+  return setupWindow(win, panelState);
+}
+
+function setupWindow(win, panelState) {
   return new Promise((resolve, reject) => {
     // Try to set up the panel when the dom is ready
     win.onload = () => {

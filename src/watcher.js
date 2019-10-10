@@ -1,35 +1,17 @@
 const promise = null;
 const runAgain = false;
 
-export function watch(handler) {
+export function watch(context, handler) {
   const observer = new MutationObserver(handler);
-  console.log("Observing", document.body);
-  observer.observe(document.body, {
+  console.log("axe-live watching", context);
+  observer.observe(context, {
     attributes: true,
     childList: true,
     subtree: true
   });
+  return observer;
 }
 
-function stop() {
+function stop(observer) {
   observer.disconnect();
-}
-
-function runIt() {
-  console.log("RUNNING IT");
-  if (!promise) {
-    runAgain = false;
-    promise = new Promise((resolve, reject) => {
-      setTimeout(resolve, 5000);
-    }).then(() => {
-      setTimeout(() => {
-        promise = null;
-        if (runAgain) {
-          runIt();
-        }
-      }, 500);
-    });
-  } else {
-    runAgain = true;
-  }
 }

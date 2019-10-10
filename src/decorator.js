@@ -1,4 +1,5 @@
 const STYLES_ID = "axe-live-styles";
+const FRAME_ID = "axe-live-frame";
 const VIOLATION_HIGHLIGHT_STYLE = `
   {outline: rgba(255, 0, 0, 0.6) dashed 0.3rem !important; outline-offset: -0.15rem}
 `;
@@ -26,12 +27,12 @@ export function clearSelected() {
 
 export function hideFrame() {
   const styles = ensureStyleSheet();
-  styles.sheet.rules[2].selectorText = "#axe-live-frame";
+  styles.sheet.rules[2].selectorText = `#${FRAME_ID}`;
 }
 
 export function showFrame() {
   const styles = ensureStyleSheet();
-  styles.sheet.rules[2].selectorText = STYLES_ID;
+  styles.sheet.rules[2].selectorText = `#${STYLES_ID}`;
 }
 
 function ensureStyleSheet() {
@@ -39,8 +40,8 @@ function ensureStyleSheet() {
   if (!sheet) {
     sheet = document.head.appendChild(document.createElement("style"));
     sheet.id = STYLES_ID;
-    // rule 2 - frameHide
-    sheet.sheet.insertRule(`#${STYLES_ID} ${HIDDEN_FRAME_STYLE}`);
+    // rule 2 - frameHide - starts hidden
+    sheet.sheet.insertRule(`#${FRAME_ID} ${HIDDEN_FRAME_STYLE}`);
     // rule 1 - selection
     sheet.sheet.insertRule(`#${STYLES_ID} ${VIOLATION_SELECTED_STYLE}`);
     // rule 0 - highlight
