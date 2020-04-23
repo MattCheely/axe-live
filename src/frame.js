@@ -1,8 +1,8 @@
 import * as Decorator from "./decorator.js";
+import { Elm } from "./ErrorPanel.elm";
 
 const FRAME_ID = "axe-live-frame";
 const WINDOW_ID = "axe-live-window";
-const PANEL_ID = "axe-live-panel";
 const FRAME_STYLE = `
 position: fixed;
 bottom: 0;
@@ -13,58 +13,57 @@ z-index: 9999999;
 border: none;
 `;
 
-const frameContent = `
-<div id="${PANEL_ID}"><div>PANEL GOES HERE</div></div>
-`;
-
-const frameUrl = `data:text/html,${frameContent}`;
-
-export function getFrame() {
+export function getFramePanel(panelState) {
   let frame = document.getElementById(FRAME_ID);
   if (!frame) {
     frame = document.createElement("iframe");
     frame.setAttribute("id", FRAME_ID);
+    frame.setAttribute("title", "Axe-Live Violation Panel");
     frame.setAttribute("style", FRAME_STYLE);
     document.body.appendChild(frame);
   }
-  return setupWindow(frame.contentWindow);
+  return setupWindow(frame.contentWindow, panelState);
 }
 
-export function getWindow() {
+export function getWindowPanel(panelState) {
+  panelState.externalPanel = true;
   const win = window.open(
     "",
     WINDOW_ID,
     "menubar=no,toolbar=no,location=no,personalbar=no,status=no"
   );
-  return setupWindow(win);
-}
 
-function setupWindow(win) {
+  Decorator.hideFrame();
+  // when the window closes, show the frame panel
   win.onbeforeunload = () => {
     Decorator.showFrame();
   };
+
+  return setupWindow(win, panelState);
+}
+
+function setupWindow(win, panelState) {
   return new Promise((resolve, reject) => {
+    // Try to set up the panel when the dom is ready
     win.onload = () => {
-      resolve(tryDocSetup(win));
+      resolve(getPanel(win, panelState));
     };
     // Kludge for cross-browser onload inconsistencies in about:blank
     setTimeout(() => {
-      resolve(tryDocSetup(win));
+      resolve(getPanel(win, panelState));
     }, 60);
   });
 }
 
-function tryDocSetup(win) {
-  if (!win.axeLiveLoaded) {
-    win.document.body.innerHTML = frameContent;
-    win.axeLiveLoaded = true;
-    return getPanelElement(win.document);
-  } else {
-    return getPanelElement(win.document);
-  }
-}
+function getPanel(win, panelState) {
+  if (!win.panelApp) {
+    const target = win.document.createElement("div");
+    win.document.body.appendChild(target);
 
-function getPanelElement(document) {
-  const wrapper = document.getElementById(PANEL_ID);
-  return wrapper && wrapper.children[0];
+    win.panelApp = Elm.ErrorPanel.init({
+      node: target,
+      flags: panelState
+    });
+  }
+  return win.panelApp;
 }

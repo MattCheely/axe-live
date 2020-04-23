@@ -8,19 +8,31 @@
     />
   </head>
   <body>
-    <div class="container pt-3">
-      <div class="row mb-3">
-        Not a real label
-        <input type="text" />
+    <main>
+      <div class="container pt-3">
+        <div class="row mb-3">
+          Not a real label
+          <input type="text" />
+        </div>
+        <div class="row mb-3">
+          <label for="labeled">Labeled</label>
+          <input type="text" id="labeled" />
+        </div>
+        <div class="row mb-3">
+          <label for="emptyLabel"></label>
+          <input type="text" id="emptyLabel" />
+        </div>
+        <div class="row mb-3">
+          <input id="nolabel" type="password" />
+        </div>
+        <div class="row mb-3">
+          <button type="button" class="btn btn-dark" id="toggle">
+            Add/Remove Nodes
+          </button>
+        </div>
       </div>
-      <div class="row mb-3">
-        <label for="labeled">Labeled</label>
-        <input type="text" id="labeled" />
-      </div>
-      <div class="row mb-3">
-        <input type="password" />
-      </div>
-    </div>
+      <div id="dynamic" class="container pt-3"></div>
+    </main>
     <script src="./demo.js"></script>
   </body>
 </html>

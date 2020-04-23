@@ -1,60 +1,88 @@
 import axe from "axe-core";
-import { Elm } from "./ErrorPanel.elm";
 import * as Decorator from "./decorator.js";
 import * as Frame from "./frame.js";
 import * as EventBlocker from "./event-blocker.js";
+import * as Watcher from "./watcher.js";
 
-export function run(...axeArgs) {
-  axe
-    .run(...axeArgs)
-    .then(violationsByNode)
-    .then(showViolations);
+export async function run(context = document, options) {
+  const result = await runAxe(context, options);
+  await showViolations(result);
 }
 
-window.axeLive = run;
+export async function watch(context = document, options) {
+  const result = await runAxe(context, options);
+  const panels = await showViolations(result);
 
-function violationsByNode(axeResults) {
-  return axeResults.violations.reduce(collectNodes, {});
-}
-
-function collectNodes(byNode, violation) {
-  violation.nodes.forEach(node => {
-    const selector = node.target[0];
-    const failureSummary = node.failureSummary;
-    byNode[selector] = byNode[selector] || [];
-    byNode[selector].push({ ...violation, failureSummary });
+  Watcher.watch(context, async mutations => {
+    panels.frame.ports.notifyChanges.send(mutations);
   });
-  return byNode;
 }
 
-async function showViolations(violations) {
-  const allSelectors = Object.keys(violations);
-  const elementSelectors = allSelectors.filter(notBodyOrHtml);
+async function runAxe(context, options = {}) {
+  //TODO: try "no-passes" reporter
+  let ourOpts = { ...options, reporter: "v1" };
+  return await axe.run(context, ourOpts);
+}
+
+async function showViolations(axeResult) {
+  const violations = axeResult.violations;
   const panels = {};
 
-  if (allSelectors.length > 0) {
-    Decorator.markViolations(elementSelectors);
+  panels.frame = await Frame.getFramePanel({
+    selectedElement: null,
+    problems: violations
+  });
 
-    panels.frame = await renderErrorPanel(violations);
-    panels.frame.ports.requestSelection.subscribe(toSelect => {
-      selectElement(toSelect, panels, elementSelectors);
-    });
-    panels.frame.ports.requestPopOut.subscribe(async panelState => {
-      const target = await Frame.getWindow();
-      panels.window = Elm.ErrorPanel.init({
-        node: target,
-        flags: { ...panelState, externalPanel: true }
-      });
-      panels.window.ports.requestSelection.subscribe(toSelect => {
-        selectElement(toSelect, panels, elementSelectors);
-      });
+  panels.frame.ports.flagErrorElements.subscribe(selectors => {
+    if (selectors.length === 0) {
       Decorator.hideFrame();
+    } else {
+      Decorator.showFrame();
+    }
+    const elementSelectors = filterSelectors(selectors);
+    Decorator.markViolations(elementSelectors);
+    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
+      selectElement(interceptedSelector, panels);
+    });
+  });
+
+  panels.frame.ports.selectElement.subscribe(toSelect => {
+    highlightSelection(toSelect);
+  });
+
+  panels.frame.ports.checkElements.subscribe(async toCheck => {
+    console.log(toCheck);
+    let elements = toCheck.elements || [];
+    let selected = document.querySelectorAll(toCheck.selectors.join(","));
+    selected.forEach(element => {
+      elements.push(element);
     });
 
-    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
-      selectElement(interceptedSelector, panels, elementSelectors);
+    let results = await runAxe(elements);
+    showResults(panels, results);
+  });
+
+  panels.frame.ports.requestPopOut.subscribe(async panelState => {
+    panels.window = await Frame.getWindowPanel(panelState);
+    panels.window.ports.selectElement.subscribe(toSelect => {
+      highlightSelection(toSelect);
+      panels.frame.ports.elementSelected.send(toSelect);
     });
+  });
+
+  return panels;
+}
+
+function highlightSelection(toSelect) {
+  if (toSelect) {
+    Decorator.highlightSelected(toSelect);
+  } else {
+    Decorator.clearSelected();
   }
+}
+
+function filterSelectors(selectors) {
+  return selectors.filter(notBodyOrHtml);
 }
 
 function notBodyOrHtml(selector) {
@@ -64,22 +92,18 @@ function notBodyOrHtml(selector) {
   );
 }
 
-function selectElement(selector, panels, selectableElements) {
-  if (!selector) {
-    Decorator.clearSelected();
-  } else if (selectableElements.includes(selector)) {
-    Decorator.highlightSelected(selector);
-  }
-  panels.frame.ports.selectedElement.send(selector);
+function selectElement(selector, panels) {
+  highlightSelection(selector);
   if (panels.window) {
-    panels.window.ports.selectedElement.send(selector);
+    panels.window.ports.elementSelected.send(selector);
+  } else {
+    panels.frame.ports.elementSelected.send(selector);
   }
 }
 
-async function renderErrorPanel(violations) {
-  const panel = await Frame.getFrame();
-  return Elm.ErrorPanel.init({
-    node: panel,
-    flags: { selectedElement: null, problems: violations }
-  });
+function showResults(panels, results) {
+  if (panels.window) {
+    panels.window.ports.violations.send(results.violations);
+  }
+  panels.frame.ports.violations.send(results.violations);
 }
