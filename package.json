@@ -1,6 +1,6 @@
 {
   "name": "axe-live",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Show a11y audit results inline on pages",
   "main": "src/axe-live.js",
   "browser": "dist/axe-live.js",
