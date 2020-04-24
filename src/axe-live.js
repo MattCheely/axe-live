@@ -35,9 +35,9 @@ async function showViolations(axeResult) {
 
   panels.frame.ports.flagErrorElements.subscribe(selectors => {
     if (selectors.length === 0) {
-      Decorator.hideFrame();
+      closePanel(panels);
     } else {
-      Decorator.showFrame();
+      openPanel(panels);
     }
     const elementSelectors = filterSelectors(selectors);
     Decorator.markViolations(elementSelectors);
@@ -51,7 +51,6 @@ async function showViolations(axeResult) {
   });
 
   panels.frame.ports.checkElements.subscribe(async toCheck => {
-    console.log(toCheck);
     let elements = toCheck.elements || [];
     let selected = document.querySelectorAll(toCheck.selectors.join(","));
     selected.forEach(element => {
@@ -106,4 +105,16 @@ function showResults(panels, results) {
     panels.window.ports.violations.send(results.violations);
   }
   panels.frame.ports.violations.send(results.violations);
+}
+
+function closePanel(panels) {
+  if (!panels.window) {
+    Decorator.hideFrame();
+  }
+}
+
+function openPanel(panels) {
+  if (!panels.window) {
+    Decorator.showFrame();
+  }
 }

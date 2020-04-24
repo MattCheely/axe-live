@@ -1,4 +1,4 @@
-port module ErrorPanel exposing (main)
+module ErrorPanel exposing (main)
 
 import Accessibility.Styled as Html
     exposing
@@ -16,8 +16,8 @@ import Accessibility.Styled as Html
 import Accessibility.Styled.Style exposing (invisible)
 import Axe exposing (ElementProblem, PageProblems, problemsDecoder)
 import Browser
-import Css exposing (..)
-import Dict exposing (Dict)
+import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundSize, borderStyle, bottom, color, cursor, fontFamily, fontSize, height, hex, int, left, marginBottom, marginLeft, marginTop, none, overflow, padding, pct, pointer, position, px, rgb, rgba, right, sansSerif, top, transparent, url, width, zIndex)
+import Dict
 import Html.Styled.Attributes exposing (css, href, id, target)
 import Html.Styled.Events exposing (onClick)
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
