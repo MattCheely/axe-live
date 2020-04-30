@@ -33,66 +33,40 @@ async function showViolations(axeResult) {
     problems: violations
   });
 
-  panels.frame.ports.flagErrorElements.subscribe(selectors => {
-    if (selectors.length === 0) {
-      closePanel(panels);
-    } else {
-      openPanel(panels);
-    }
-    const elementSelectors = filterSelectors(selectors);
-    Decorator.markViolations(elementSelectors);
-    EventBlocker.interceptEvents(elementSelectors, interceptedSelector => {
-      selectElement(interceptedSelector, panels);
-    });
-  });
+  panels.frame.ports.updateExternalState.subscribe(
+    updateExternalState.bind(null, panels)
+  );
 
-  panels.frame.ports.selectElement.subscribe(toSelect => {
-    highlightSelection(toSelect);
-  });
-
-  panels.frame.ports.checkElements.subscribe(async toCheck => {
-    let elements = toCheck.elements || [];
-    let selected = document.querySelectorAll(toCheck.selectors.join(","));
-    selected.forEach(element => {
-      elements.push(element);
-    });
-
-    let results = await runAxe(elements);
-    showResults(panels, results);
-  });
-
-  panels.frame.ports.requestPopOut.subscribe(async panelState => {
-    panels.window = await Frame.getWindowPanel(panelState);
-    panels.window.ports.selectElement.subscribe(toSelect => {
-      highlightSelection(toSelect);
-      panels.frame.ports.elementSelected.send(toSelect);
-    });
-  });
+  panels.frame.ports.checkElements.subscribe(
+    checkChangedElements.bind(null, panels)
+  );
 
   return panels;
 }
 
-function highlightSelection(toSelect) {
-  if (toSelect) {
-    Decorator.highlightSelected(toSelect);
-  } else {
-    Decorator.clearSelected();
-  }
-}
-
-function filterSelectors(selectors) {
-  return selectors.filter(notBodyOrHtml);
-}
-
-function notBodyOrHtml(selector) {
-  return !(
-    document.body.matches(selector) ||
-    document.body.parentElement.matches(selector)
+function updateExternalState(panels, appState) {
+  Decorator.updateStyles(appState);
+  EventBlocker.interceptEvents(
+    appState.problemElements,
+    interceptedSelector => {
+      selectElement(interceptedSelector, panels);
+    }
   );
+  Frame.updatePanelWindows(panels, appState, updateExternalState);
+}
+
+async function checkChangedElements(panels, toCheck) {
+  let elements = toCheck.elements || [];
+  let selected = document.querySelectorAll(toCheck.selectors.join(","));
+  selected.forEach(element => {
+    elements.push(element);
+  });
+
+  let results = await runAxe(elements);
+  sendResultsToElm(panels, results);
 }
 
 function selectElement(selector, panels) {
-  highlightSelection(selector);
   if (panels.window) {
     panels.window.ports.elementSelected.send(selector);
   } else {
@@ -100,21 +74,9 @@ function selectElement(selector, panels) {
   }
 }
 
-function showResults(panels, results) {
+function sendResultsToElm(panels, results) {
   if (panels.window) {
     panels.window.ports.violations.send(results.violations);
   }
   panels.frame.ports.violations.send(results.violations);
-}
-
-function closePanel(panels) {
-  if (!panels.window) {
-    Decorator.hideFrame();
-  }
-}
-
-function openPanel(panels) {
-  if (!panels.window) {
-    Decorator.showFrame();
-  }
 }

@@ -1,5 +1,8 @@
+import { filterSelectors } from "./exclusions.js";
+
 export function interceptEvents(elementSelectors, onIntercepted) {
-  const handler = eventHandler(elementSelectors, onIntercepted);
+  const targetSelectors = filterSelectors(elementSelectors);
+  const handler = eventHandler(targetSelectors, onIntercepted);
   document.addEventListener("click", handler, { capture: true });
   document.addEventListener("focus", noop, { capture: true });
   document.addEventListener("keydown", handler, { capture: true });

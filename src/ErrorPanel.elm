@@ -32,7 +32,7 @@ import Ports
 type alias A11yReport =
     { problems : PageProblems
     , selectedElement : Maybe String
-    , externalPanel : Bool
+    , popoutOpen : Bool
     }
 
 
@@ -44,7 +44,7 @@ init : Value -> ( Model, Cmd Msg )
 init flags =
     case decodeValue modelDecoder flags of
         Ok model ->
-            ( Ok model, flagProblems model.problems )
+            ( Ok model, sendExternalState model )
 
         Err err ->
             ( Err ("I couldn't understand the output from axe. " ++ Decode.errorToString err)
@@ -58,7 +58,7 @@ modelDecoder =
         (Decode.field "problems" problemsDecoder)
         (Decode.field "selectedElement" (Decode.nullable Decode.string))
         (Decode.oneOf
-            [ Decode.field "externalPanel" Decode.bool
+            [ Decode.field "popoutOpen" Decode.bool
             , Decode.succeed False
             ]
         )
@@ -72,7 +72,7 @@ encodeModel model =
                 |> Maybe.withDefault Encode.null
           )
         , ( "problems", Axe.encodeProblems model.problems )
-        , ( "externalPanel", Encode.bool model.externalPanel )
+        , ( "popoutOpen", Encode.bool model.popoutOpen )
         ]
 
 
@@ -98,6 +98,7 @@ type Msg
     = ElementSelected String
     | UnselectElement
     | PopOut
+    | PopIn
     | DomChanged (List MutationRecord)
     | GotViolations PageProblems
     | DisplayError String
@@ -122,22 +123,32 @@ update : Msg -> A11yReport -> Result String ( A11yReport, Cmd Msg )
 update msg model =
     case msg of
         ElementSelected selector ->
-            Ok
-                ( { model | selectedElement = Just selector }
-                , updateSelected (Just selector)
-                )
+            let
+                newModel =
+                    { model | selectedElement = Just selector }
+            in
+            Ok ( newModel, sendExternalState newModel )
 
         UnselectElement ->
-            Ok
-                ( { model | selectedElement = Nothing }
-                , updateSelected Nothing
-                )
+            let
+                newModel =
+                    { model | selectedElement = Nothing }
+            in
+            Ok ( newModel, sendExternalState newModel )
 
         PopOut ->
-            Ok
-                ( model
-                , popToWindow { model | externalPanel = True }
-                )
+            let
+                newModel =
+                    { model | popoutOpen = True }
+            in
+            Ok ( newModel, sendExternalState newModel )
+
+        PopIn ->
+            let
+                newModel =
+                    { model | popoutOpen = False }
+            in
+            Ok ( newModel, sendExternalState newModel )
 
         DomChanged changes ->
             Ok
@@ -150,13 +161,7 @@ update msg model =
                 newModel =
                     model |> withProblems problems
             in
-            Ok
-                ( newModel
-                , Cmd.batch
-                    [ flagProblems newModel.problems
-                    , updateSelected newModel.selectedElement
-                    ]
-                )
+            Ok ( newModel, sendExternalState newModel )
 
         DisplayError error ->
             Err error
@@ -264,7 +269,7 @@ reportView model =
 
       else
         h2 [] [ text "No problems found. Nice work!" ]
-    , popOutIcon model.externalPanel
+    , popOutIcon model.popoutOpen
     ]
 
 
@@ -371,22 +376,21 @@ externalLink =
 -- PORTS
 
 
-popToWindow : A11yReport -> Cmd msg
-popToWindow model =
-    Ports.requestPopOut (encodeModel model)
-
-
-flagProblems : PageProblems -> Cmd msg
-flagProblems problems =
-    Dict.keys problems
-        |> Encode.list Encode.string
-        |> Ports.flagErrorElements
-
-
-updateSelected : Maybe String -> Cmd msg
-updateSelected selectedElement =
-    Maybe.withDefault "" selectedElement
-        |> Ports.selectElement
+sendExternalState : A11yReport -> Cmd msg
+sendExternalState model =
+    Encode.object
+        [ ( "selectedElement"
+          , Maybe.map Encode.string model.selectedElement
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "problems", Axe.encodeProblems model.problems )
+        , ( "problemElements"
+          , Dict.keys model.problems
+                |> Encode.list Encode.string
+          )
+        , ( "popoutOpen", Encode.bool model.popoutOpen )
+        ]
+        |> Ports.updateExternalState
 
 
 a11yCheck : List MutationRecord -> PageProblems -> Cmd msg
@@ -434,6 +438,7 @@ mutationRecordDecoder =
 -- MAIN
 
 
+main : Program Value Model Msg
 main =
     Browser.element
         { init = init
@@ -445,6 +450,7 @@ main =
                     [ Ports.elementSelected ElementSelected
                     , Ports.notifyChanges handleDomChanges
                     , Ports.violations handleViolationReport
+                    , Ports.popIn (always PopIn)
                     ]
                 )
         }

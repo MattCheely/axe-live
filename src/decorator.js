@@ -1,3 +1,5 @@
+import { filterSelectors } from "./exclusions.js";
+
 const STYLES_ID = "axe-live-styles";
 const FRAME_ID = "axe-live-frame";
 const VIOLATION_HIGHLIGHT_STYLE = `
@@ -10,27 +12,54 @@ const HIDDEN_FRAME_STYLE = `
   {display: none}
 `;
 
-export function markViolations(selectors) {
+export function updateStyles(appState) {
+  const hasProblems = appState.problemElements.length > 0;
+  const flaggableProblems = filterSelectors(appState.problemElements);
+
+  if (appState.selectedElement && hasProblems) {
+    highlightSelected(appState.selectedElement);
+  } else {
+    clearSelected();
+  }
+
+  if (hasProblems) {
+    markViolations(flaggableProblems);
+  } else {
+    clearViolations();
+  }
+
+  if (!appState.popoutOpen && hasProblems) {
+    showFrame();
+  } else {
+    hideFrame();
+  }
+}
+
+function markViolations(selectors) {
   const jointSelector = selectors.join(",");
   const styles = ensureStyleSheet();
   styles.sheet.rules[0].selectorText = jointSelector;
 }
 
-export function highlightSelected(selector) {
+function clearViolations() {
+  markViolations([`#${STYLES_ID}`]);
+}
+
+function highlightSelected(selector) {
   const styles = ensureStyleSheet();
   styles.sheet.rules[1].selectorText = selector;
 }
 
-export function clearSelected() {
+function clearSelected() {
   highlightSelected(`#${STYLES_ID}`);
 }
 
-export function hideFrame() {
+function hideFrame() {
   const styles = ensureStyleSheet();
   styles.sheet.rules[2].selectorText = `#${FRAME_ID}`;
 }
 
-export function showFrame() {
+function showFrame() {
   const styles = ensureStyleSheet();
   styles.sheet.rules[2].selectorText = `#${STYLES_ID}`;
 }

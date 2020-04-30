@@ -1,7 +1,7 @@
 import * as Decorator from "./decorator.js";
 import { Elm } from "./ErrorPanel.elm";
 
-const FRAME_ID = "axe-live-frame";
+export const FRAME_ID = "axe-live-frame";
 const WINDOW_ID = "axe-live-window";
 const FRAME_STYLE = `
 position: fixed;
@@ -13,7 +13,22 @@ z-index: 9999999;
 border: none;
 `;
 
-export function getFramePanel(panelState) {
+export async function updatePanelWindows(
+  panels,
+  appState,
+  onWindowStateChange
+) {
+  if (appState.popoutOpen && !panels.window) {
+    panels.window = await getWindowPanel(appState, panels.frame);
+    panels.window.ports.updateExternalState.subscribe(
+      onWindowStateChange.bind(null, panels)
+    );
+  } else if (!appState.popoutOpen && panels.window) {
+    panels.window = null;
+  }
+}
+
+export function getFramePanel(appState) {
   let frame = document.getElementById(FRAME_ID);
   if (!frame) {
     frame = document.createElement("iframe");
@@ -23,47 +38,45 @@ export function getFramePanel(panelState) {
     frame.setAttribute("style", FRAME_STYLE);
     document.body.appendChild(frame);
   }
-  return setupWindow(frame.contentWindow, panelState);
+  return setupWindow(frame.contentWindow, appState);
 }
 
-export function getWindowPanel(panelState) {
-  panelState.externalPanel = true;
+export function getWindowPanel(appState, framedApp) {
   const win = window.open(
     "",
     WINDOW_ID,
     "menubar=no,toolbar=no,location=no,personalbar=no,status=no"
   );
 
-  Decorator.hideFrame();
   // when the window closes, show the frame panel
   win.onbeforeunload = () => {
-    Decorator.showFrame();
+    framedApp.ports.popIn.send();
   };
 
-  return setupWindow(win, panelState);
+  return setupWindow(win, appState);
 }
 
-function setupWindow(win, panelState) {
+function setupWindow(win, appState) {
   return new Promise((resolve, reject) => {
     // Try to set up the panel when the dom is ready
     win.onload = () => {
-      resolve(getPanel(win, panelState));
+      resolve(getPanel(win, appState));
     };
     // Kludge for cross-browser onload inconsistencies in about:blank
     setTimeout(() => {
-      resolve(getPanel(win, panelState));
+      resolve(getPanel(win, appState));
     }, 60);
   });
 }
 
-function getPanel(win, panelState) {
+function getPanel(win, appState) {
   if (!win.panelApp) {
     const target = win.document.createElement("div");
     win.document.body.appendChild(target);
 
     win.panelApp = Elm.ErrorPanel.init({
       node: target,
-      flags: panelState
+      flags: appState
     });
   }
   return win.panelApp;

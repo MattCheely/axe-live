@@ -85,6 +85,7 @@ type alias Node =
     }
 
 
+violationDecoder : Decoder Violation
 violationDecoder =
     Decode.map4 Violation
         (Decode.field "description" Decode.string)
@@ -109,7 +110,7 @@ axeTargetDecoder =
                     target :: [] ->
                         Decode.succeed target
 
-                    a :: b ->
+                    _ :: _ ->
                         Decode.fail twoValueTargetError
 
                     [] ->
@@ -117,6 +118,7 @@ axeTargetDecoder =
             )
 
 
+twoValueTargetError : String
 twoValueTargetError =
     """
 I found two values in an axe node target! This has never happened before and
