@@ -1,5 +1,5 @@
 import * as Decorator from "./decorator.js";
-import { Elm } from "./ErrorPanel.elm";
+import Elm from "./ErrorPanel.elm";
 
 export const FRAME_ID = "axe-live-frame";
 const WINDOW_ID = "axe-live-window";

@@ -1,4 +1,4 @@
-import * as AxeLive from "../src/axe-live.js";
+import * as AxeLive from "../dist/axe-live.js";
 
 AxeLive.watch();
 

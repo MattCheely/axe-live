@@ -1,19 +1,16 @@
 {
   "name": "axe-live",
+  "type": "module",
   "version": "0.0.6",
   "description": "Show a11y audit results inline on pages",
   "main": "src/axe-live.js",
   "browser": "dist/axe-live.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "parcel test/*.html",
-    "build": "webpack"
+    "start": "vite",
+    "build": "rollup -c",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "axe",
-    "a11y",
-    "accessibility"
-  ],
+  "keywords": ["axe", "a11y", "accessibility"],
   "author": "Matt Cheely",
   "repository": "https://github.com/MattCheely/axe-live.git",
   "license": "Apache-2.0",
@@ -21,16 +18,10 @@
     "axe-core": "^3.5.1"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.6.0",
-    "elm": "^0.19.0-no-deps",
-    "elm-doc-preview": "^3.0.1",
-    "elm-hot": "^1.1.2",
-    "elm-webpack-loader": "^6.0.0",
-    "parcel": "^1.12.3",
-    "webpack": "^4.40.2",
-    "webpack-cli": "^3.3.9"
+    "elm": "^0.19.1-5",
+    "rollup": "^2.51.2",
+    "rollup-plugin-elm": "^3.0.0",
+    "vite": "^2.3.7"
   },
-  "browserslist": [
-    "last 1 Chrome versions"
-  ]
+  "browserslist": ["last 1 Chrome versions"]
 }
