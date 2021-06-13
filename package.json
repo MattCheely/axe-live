@@ -1,7 +1,7 @@
 {
   "name": "axe-live",
   "type": "module",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Show a11y audit results inline on pages",
   "main": "src/axe-live.js",
   "browser": "dist/axe-live.js",
@@ -10,7 +10,11 @@
     "build": "rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["axe", "a11y", "accessibility"],
+  "keywords": [
+    "axe",
+    "a11y",
+    "accessibility"
+  ],
   "author": "Matt Cheely",
   "repository": "https://github.com/MattCheely/axe-live.git",
   "license": "Apache-2.0",
@@ -23,5 +27,7 @@
     "rollup-plugin-elm": "^3.0.0",
     "vite": "^2.3.7"
   },
-  "browserslist": ["last 1 Chrome versions"]
+  "browserslist": [
+    "last 1 Chrome versions"
+  ]
 }
