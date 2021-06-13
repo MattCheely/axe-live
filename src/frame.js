@@ -33,8 +33,8 @@ export function getFramePanel(appState) {
   if (!frame) {
     frame = document.createElement("iframe");
     frame.setAttribute("id", FRAME_ID);
-    frame.setAttribute("role", "complementary");
-    frame.setAttribute("title", "Axe-Live Violation Panel");
+    frame.setAttribute("role", "document");
+    frame.setAttribute("title", "Axe-Live Violations");
     frame.setAttribute("style", FRAME_STYLE);
     document.body.appendChild(frame);
   }

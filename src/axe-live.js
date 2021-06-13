@@ -3,6 +3,7 @@ import * as Decorator from "./decorator.js";
 import * as Frame from "./frame.js";
 import * as EventBlocker from "./event-blocker.js";
 import * as Watcher from "./watcher.js";
+import { log } from "./logger.js";
 
 export async function run(context = document, options) {
   const result = await runAxe(context, options);
@@ -19,9 +20,12 @@ export async function watch(context = document, options) {
 }
 
 async function runAxe(context, options = {}) {
+  log(`a11y check starting for ${context.length} items`);
   //TODO: try "no-passes" reporter
   let ourOpts = { ...options, reporter: "v1" };
-  return await axe.run(context, ourOpts);
+  let result = await axe.run(context, ourOpts);
+  log("a11y check completed");
+  return result;
 }
 
 async function showViolations(axeResult) {
