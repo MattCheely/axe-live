@@ -19,7 +19,7 @@
   "repository": "https://github.com/MattCheely/axe-live.git",
   "license": "Apache-2.0",
   "dependencies": {
-    "axe-core": "^3.5.1"
+    "axe-core": "^4.2.2"
   },
   "devDependencies": {
     "elm": "^0.19.1-5",
