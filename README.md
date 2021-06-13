@@ -1,8 +1,12 @@
 # axe-live
 
+
+https://user-images.githubusercontent.com/604797/121821320-4fa6e400-cc66-11eb-8362-45f20306e416.mp4
+
+
 ## About
 
-axe-live is work-in-progress framework-agnostic tool for runnin accessibility (a11y) checks against web
+axe-live is a work-in-progress framework-agnostic tool for running accessibility checks against web
 applications. It uses Deque Labs' [axe](https://www.deque.com/axe/) library to highlight and disable
 elements on the page which have accessibility problems. The goal is to provide something like compiler
 errors for accessibilty during the development cycle. This should help problems get addressed right
