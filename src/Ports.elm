@@ -1,4 +1,12 @@
-port module Ports exposing (checkElements, elementSelected, notifyChanges, popIn, updateExternalState, violations)
+port module Ports exposing
+    ( axeRunning
+    , checkElements
+    , elementSelected
+    , notifyChanges
+    , popIn
+    , updateExternalState
+    , violations
+    )
 
 import Json.Encode exposing (Value)
 
@@ -17,6 +25,9 @@ port notifyChanges : (Value -> msg) -> Sub msg
 
 
 port popIn : (Value -> msg) -> Sub msg
+
+
+port axeRunning : (Bool -> msg) -> Sub msg
 
 
 

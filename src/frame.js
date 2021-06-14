@@ -48,8 +48,14 @@ export function getWindowPanel(appState, framedApp) {
     "menubar=no,toolbar=no,location=no,personalbar=no,status=no"
   );
 
+  const closeWindow = win.close.bind(win);
+
+  // Close the external panel when this window unloads
+  window.addEventListener("beforeunload", closeWindow);
+
   // when the window closes, show the frame panel
   win.onbeforeunload = () => {
+    window.removeEventListener("beforeunload", closeWindow);
     framedApp.ports.popIn.send();
   };
 

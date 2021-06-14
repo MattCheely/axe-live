@@ -66,15 +66,23 @@ import Ports
 -- MODEL
 
 
+type alias Model =
+    Result String A11yReport
+
+
 type alias A11yReport =
     { problems : PageProblems
     , selectedElement : Maybe String
     , popoutOpen : Bool
+    , axeRunning : Bool
+    , uncheckedChanges : List MutationRecord
     }
 
 
-type alias Model =
-    Result String A11yReport
+type alias MutationRecord =
+    -- TODO: Get rid of the one-field record
+    { target : Value
+    }
 
 
 init : Value -> ( Model, Cmd Msg )
@@ -91,7 +99,7 @@ init flags =
 
 modelDecoder : Decoder A11yReport
 modelDecoder =
-    Decode.map3 A11yReport
+    Decode.map5 A11yReport
         (Decode.field "problems" problemsDecoder)
         (Decode.field "selectedElement" (Decode.nullable Decode.string))
         (Decode.oneOf
@@ -99,6 +107,8 @@ modelDecoder =
             , Decode.succeed False
             ]
         )
+        (Decode.field "axeRunning" Decode.bool)
+        (Decode.field "uncheckedChanges" (Decode.list mutationRecordDecoder))
 
 
 encodeModel : A11yReport -> Value
@@ -109,8 +119,26 @@ encodeModel model =
                 |> Maybe.withDefault Encode.null
           )
         , ( "problems", Axe.encodeProblems model.problems )
+        , ( "problemElements"
+          , Dict.keys model.problems
+                |> Encode.list Encode.string
+          )
         , ( "popoutOpen", Encode.bool model.popoutOpen )
+        , ( "axeRunning", Encode.bool model.axeRunning )
+        , ( "uncheckedChanges", Encode.list mutationRecordEncoder model.uncheckedChanges )
         ]
+
+
+mutationRecordDecoder : Decoder MutationRecord
+mutationRecordDecoder =
+    Decode.map MutationRecord
+        (Decode.field "target" Decode.value)
+
+
+mutationRecordEncoder : MutationRecord -> Value
+mutationRecordEncoder mutationRecord =
+    Encode.object
+        [ ( "target", mutationRecord.target ) ]
 
 
 withProblems : PageProblems -> A11yReport -> A11yReport
@@ -139,11 +167,7 @@ type Msg
     | DomChanged (List MutationRecord)
     | GotViolations PageProblems
     | DisplayError String
-
-
-type alias MutationRecord =
-    { target : Value
-    }
+    | AxeRunning Bool
 
 
 updateWrapper : Msg -> Model -> ( Model, Cmd Msg )
@@ -188,10 +212,14 @@ update msg model =
             Ok ( newModel, sendExternalState newModel )
 
         DomChanged changes ->
-            Ok
-                ( model
-                , a11yCheck changes model.problems
-                )
+            { model | uncheckedChanges = List.append changes model.uncheckedChanges }
+                |> runChecksIfNeeded
+                |> Ok
+
+        AxeRunning axeRunning ->
+            { model | axeRunning = axeRunning }
+                |> runChecksIfNeeded
+                |> Ok
 
         GotViolations problems ->
             let
@@ -202,6 +230,17 @@ update msg model =
 
         DisplayError error ->
             Err error
+
+
+runChecksIfNeeded : A11yReport -> ( A11yReport, Cmd msg )
+runChecksIfNeeded model =
+    if model.axeRunning == False && not (List.isEmpty model.uncheckedChanges) then
+        ( { model | uncheckedChanges = [] }
+        , a11yCheck model.uncheckedChanges model.problems
+        )
+
+    else
+        ( model, Cmd.none )
 
 
 
@@ -417,25 +456,18 @@ externalLink =
 
 sendExternalState : A11yReport -> Cmd msg
 sendExternalState model =
-    Encode.object
-        [ ( "selectedElement"
-          , Maybe.map Encode.string model.selectedElement
-                |> Maybe.withDefault Encode.null
-          )
-        , ( "problems", Axe.encodeProblems model.problems )
-        , ( "problemElements"
-          , Dict.keys model.problems
-                |> Encode.list Encode.string
-          )
-        , ( "popoutOpen", Encode.bool model.popoutOpen )
-        ]
+    encodeModel model
         |> Ports.updateExternalState
 
 
 a11yCheck : List MutationRecord -> PageProblems -> Cmd msg
 a11yCheck mutations problems =
     Encode.object
+        -- On a DOM change, check all the elements that changed for issues
         [ ( "elements", Encode.list identity (List.map .target mutations) )
+
+        -- Also check all the elements that currently have problems,
+        -- in case the changes fixed them
         , ( "selectors", Encode.list Encode.string (Dict.keys problems) )
         ]
         |> Ports.checkElements
@@ -467,12 +499,6 @@ handleViolationReport violationJson =
                 )
 
 
-mutationRecordDecoder : Decoder MutationRecord
-mutationRecordDecoder =
-    Decode.map MutationRecord
-        (Decode.field "target" Decode.value)
-
-
 
 -- MAIN
 
@@ -490,6 +516,7 @@ main =
                     , Ports.notifyChanges handleDomChanges
                     , Ports.violations handleViolationReport
                     , Ports.popIn (always PopIn)
+                    , Ports.axeRunning AxeRunning
                     ]
                 )
         }

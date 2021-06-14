@@ -5,36 +5,47 @@ import * as EventBlocker from "./event-blocker.js";
 import * as Watcher from "./watcher.js";
 import { log } from "./logger.js";
 
-export async function run(context = document, options) {
+export async function run(context = document, options = {}) {
   const result = await runAxe(context, options);
-  await showViolations(result);
+  await showViolations(result, options);
 }
 
-export async function watch(context = document, options) {
+export async function watch(context = document, options = {}) {
   const result = await runAxe(context, options);
-  const panels = await showViolations(result);
+  const panels = await showViolations(result, options);
 
   Watcher.watch(context, async mutations => {
     panels.frame.ports.notifyChanges.send(mutations);
   });
 }
 
+async function reCheck(panels, context, options) {
+  if (!options) {
+    throw "Whoops! axe-live lost the axe options somewhere!";
+  }
+  sendAxeStatusToElm(panels, true);
+  let result = await runAxe(context, options);
+  sendAxeStatusToElm(panels, false);
+  return result;
+}
+
 async function runAxe(context, options = {}) {
   log(`a11y check starting for ${context.length} items`);
-  //TODO: try "no-passes" reporter
   let ourOpts = { ...options, reporter: "v1" };
   let result = await axe.run(context, ourOpts);
   log("a11y check completed");
   return result;
 }
 
-async function showViolations(axeResult) {
+async function showViolations(axeResult, options) {
   const violations = axeResult.violations;
   const panels = {};
 
   panels.frame = await Frame.getFramePanel({
     selectedElement: null,
-    problems: violations
+    problems: violations,
+    axeRunning: false,
+    uncheckedChanges: []
   });
 
   panels.frame.ports.updateExternalState.subscribe(
@@ -42,7 +53,7 @@ async function showViolations(axeResult) {
   );
 
   panels.frame.ports.checkElements.subscribe(
-    checkChangedElements.bind(null, panels)
+    checkChangedElements.bind(null, panels, options)
   );
 
   return panels;
@@ -59,14 +70,14 @@ function updateExternalState(panels, appState) {
   Frame.updatePanelWindows(panels, appState, updateExternalState);
 }
 
-async function checkChangedElements(panels, toCheck) {
+async function checkChangedElements(panels, options, toCheck) {
   let elements = toCheck.elements || [];
   let selected = document.querySelectorAll(toCheck.selectors.join(","));
   selected.forEach(element => {
     elements.push(element);
   });
 
-  let results = await runAxe(elements);
+  let results = await reCheck(panels, elements, options);
   sendResultsToElm(panels, results);
 }
 
@@ -83,4 +94,11 @@ function sendResultsToElm(panels, results) {
     panels.window.ports.violations.send(results.violations);
   }
   panels.frame.ports.violations.send(results.violations);
+}
+
+function sendAxeStatusToElm(panels, status) {
+  if (panels.window) {
+    panels.window.ports.axeRunning.send(status);
+  }
+  panels.frame.ports.axeRunning.send(status);
 }
