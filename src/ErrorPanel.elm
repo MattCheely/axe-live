@@ -23,16 +23,25 @@ import Css
         , backgroundColor
         , backgroundImage
         , backgroundSize
+        , borderBox
         , borderStyle
         , bottom
+        , boxSizing
         , color
+        , column
         , cursor
+        , displayFlex
+        , flexDirection
+        , flexEnd
         , fontFamily
         , fontSize
         , height
         , hex
         , int
+        , justifyContent
         , left
+        , margin
+        , margin4
         , marginBottom
         , marginLeft
         , marginTop
@@ -54,12 +63,15 @@ import Css
         , width
         , zIndex
         )
+import Css.Global exposing (body, class, everything, global)
 import Dict
-import Html.Styled.Attributes exposing (css, href, id, target)
+import Html.Styled.Attributes exposing (css, href, id, target, title)
 import Html.Styled.Events exposing (onClick)
+import Icon
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
 import Json.Encode as Encode
 import Ports
+import Style
 
 
 
@@ -73,6 +85,7 @@ type alias Model =
 type alias A11yReport =
     { problems : PageProblems
     , selectedElement : Maybe String
+    , checkOnChange : Bool
     , popoutOpen : Bool
     , axeRunning : Bool
     , uncheckedChanges : List MutationRecord
@@ -99,9 +112,14 @@ init flags =
 
 modelDecoder : Decoder A11yReport
 modelDecoder =
-    Decode.map5 A11yReport
+    Decode.map6 A11yReport
         (Decode.field "problems" problemsDecoder)
         (Decode.field "selectedElement" (Decode.nullable Decode.string))
+        (Decode.oneOf
+            [ Decode.field "checkOnChange" Decode.bool
+            , Decode.succeed True
+            ]
+        )
         (Decode.oneOf
             [ Decode.field "popoutOpen" Decode.bool
             , Decode.succeed False
@@ -118,6 +136,7 @@ encodeModel model =
           , Maybe.map Encode.string model.selectedElement
                 |> Maybe.withDefault Encode.null
           )
+        , ( "checkOnChange", Encode.bool model.checkOnChange )
         , ( "problems", Axe.encodeProblems model.problems )
         , ( "problemElements"
           , Dict.keys model.problems
@@ -164,7 +183,9 @@ type Msg
     | UnselectElement
     | PopOut
     | PopIn
+    | ToggleCheckOnChange
     | DomChanged (List MutationRecord)
+    | RunAxe
     | GotViolations PageProblems
     | DisplayError String
     | AxeRunning Bool
@@ -211,10 +232,42 @@ update msg model =
             in
             Ok ( newModel, sendExternalState newModel )
 
+        ToggleCheckOnChange ->
+            let
+                newModel =
+                    { model | checkOnChange = not model.checkOnChange }
+            in
+            if newModel.checkOnChange then
+                let
+                    ( checkedModel, checkCmd ) =
+                        runChecksIfNeeded newModel
+                in
+                Ok
+                    ( checkedModel
+                    , Cmd.batch
+                        [ checkCmd
+                        , sendExternalState checkedModel
+                        ]
+                    )
+
+            else
+                Ok ( newModel, sendExternalState newModel )
+
         DomChanged changes ->
-            { model | uncheckedChanges = List.append changes model.uncheckedChanges }
-                |> runChecksIfNeeded
-                |> Ok
+            let
+                newModel =
+                    { model | uncheckedChanges = List.append changes model.uncheckedChanges }
+            in
+            if model.checkOnChange then
+                newModel
+                    |> runChecksIfNeeded
+                    |> Ok
+
+            else
+                Ok ( newModel, Cmd.none )
+
+        RunAxe ->
+            model |> runChecksIfNeeded |> Ok
 
         AxeRunning axeRunning ->
             { model | axeRunning = axeRunning }
@@ -245,6 +298,20 @@ runChecksIfNeeded model =
 
 
 -- VIEW
+
+
+globalStyles : Html Msg
+globalStyles =
+    global
+        [ everything
+            [ boxSizing borderBox ]
+        , body
+            [ margin (px 0) ]
+        , class "iconic-property-stroke"
+            [ Css.property "stroke" "currentcolor" ]
+        , class "iconic-property-fill"
+            [ Css.property "fill" "currentcolor" ]
+        ]
 
 
 linkHex =
@@ -291,7 +358,13 @@ elementListStyle =
 headerStyle =
     css
         [ fontSize (px 24)
+        , marginTop (px 0)
+        , marginBottom (px 20)
         ]
+
+
+edgePadding =
+    padding (px 10)
 
 
 view : Model -> Html Msg
@@ -299,82 +372,130 @@ view model =
     div
         [ id "axe-live-panel"
         , css
-            [ position absolute
-            , top (px 0)
-            , left (px 0)
-            , right (px 0)
-            , bottom (px 0)
+            [ displayFlex
+            , flexDirection column
             , backgroundColor (rgba 0 0 0 0.85)
             , color colors.text
-            , padding (px 20)
-            , overflow auto
-            , zIndex (int 20000)
             , fontFamily sansSerif
+            , height (pct 100)
             ]
         ]
-        (case model of
-            Ok report ->
-                reportView report
+        (globalStyles
+            :: (case model of
+                    Ok report ->
+                        [ controlsView report, reportView report ]
 
-            Err errMsg ->
-                [ h2 [ headerStyle ] [ text "Oops, something went wrong" ]
-                , div [ css [ color (rgb 255 0 0) ] ] [ text errMsg ]
-                , div [ css [ marginTop (px 20) ] ]
-                    [ text "This is probably a bug in axe-live. Please check the issues on "
-                    , a [ linkStyle, href "https://github.com/MattCheely/axe-live/issues" ] [ text "GitHub" ]
-                    , text " to see if someone has already opened an issue. If not, please open a new one."
-                    ]
-                ]
+                    Err errMsg ->
+                        [ h2 [ headerStyle ] [ text "Oops, something went wrong" ]
+                        , div [ css [ color (rgb 255 0 0) ] ] [ text errMsg ]
+                        , div [ css [ marginTop (px 20) ] ]
+                            [ text "This is probably a bug in axe-live. Please check the issues on "
+                            , a [ linkStyle, href "https://github.com/MattCheely/axe-live/issues" ] [ text "GitHub" ]
+                            , text " to see if someone has already opened an issue. If not, please open a new one."
+                            ]
+                        ]
+               )
         )
 
 
-reportView : A11yReport -> List (Html Msg)
-reportView model =
-    [ if Dict.size model.problems /= 0 then
-        case
-            model.selectedElement
-                |> Maybe.andThen
-                    (\elem ->
-                        Dict.get elem model.problems
-                            |> Maybe.map (\violations -> ( elem, violations ))
-                    )
-        of
-            Just ( selector, violations ) ->
-                describeViolations selector violations
-
-            Nothing ->
-                errorElementListing model.problems
-
-      else
-        h2 [] [ text "No problems found. Nice work!" ]
-    , popOutIcon model.popoutOpen
-    ]
-
-
-popOutIcon : Bool -> Html Msg
-popOutIcon isExternal =
-    if not isExternal then
-        button
-            [ css
-                [ position absolute
-                , top (px 20)
-                , right (px 20)
-                , height (px 20)
-                , width (px 20)
-                , backgroundColor transparent
-                , backgroundImage (url externalLink)
-                , backgroundSize (pct 100)
-                , color colors.link
-                , borderStyle none
-                , padding (px 0)
-                , cursor pointer
-                ]
-            , onClick PopOut
+controlsView : A11yReport -> Html Msg
+controlsView model =
+    div
+        [ css
+            [ edgePadding
+            , displayFlex
+            , justifyContent flexEnd
             ]
-            [ span invisible [ text "Open in external window" ] ]
+        ]
+        [ autoCheckControl model.checkOnChange
+        , checkControl model.axeRunning
+        , popOutControl model.popoutOpen
+        , Debug.todo "Controls don't work in popout window"
+        ]
+
+
+reportView : A11yReport -> Html Msg
+reportView model =
+    div
+        [ css
+            [ overflow auto
+            , edgePadding
+            ]
+        ]
+        [ if Dict.size model.problems /= 0 then
+            case
+                model.selectedElement
+                    |> Maybe.andThen
+                        (\elem ->
+                            Dict.get elem model.problems
+                                |> Maybe.map (\violations -> ( elem, violations ))
+                        )
+            of
+                Just ( selector, violations ) ->
+                    describeViolations selector violations
+
+                Nothing ->
+                    errorElementListing model.problems
+
+          else
+            h2 [] [ text "No problems found. Nice work!" ]
+        ]
+
+
+autoCheckControl : Bool -> Html Msg
+autoCheckControl autoCheckOn =
+    if autoCheckOn then
+        controlButton "Automatic checks enabled. Click to disable"
+            Icon.eye
+            ToggleCheckOnChange
+
+    else
+        controlButton "Automatic checks disabled. Click to enable"
+            Icon.eyeClosed
+            ToggleCheckOnChange
+
+
+checkControl : Bool -> Html Msg
+checkControl axeRunning =
+    if axeRunning then
+        controlButton "Accessibility checks are running"
+            (div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ])
+            RunAxe
+
+    else
+        controlButton "Run accessibility checks now"
+            Icon.loopCircular
+            RunAxe
+
+
+popOutControl : Bool -> Html Msg
+popOutControl isExternal =
+    if not isExternal then
+        controlButton "Open in external window" Icon.externalLink PopOut
 
     else
         text ""
+
+
+controlButton : String -> Html Msg -> Msg -> Html Msg
+controlButton alt icon msg =
+    button
+        [ title alt
+        , css
+            [ height (px 20)
+            , width (px 20)
+            , backgroundColor transparent
+            , backgroundSize (pct 100)
+            , color colors.link
+            , borderStyle none
+            , padding (px 0)
+            , margin4 (px 0) (px 0) (px 0) (px 10)
+            , cursor pointer
+            ]
+        , onClick msg
+        ]
+        [ icon
+        ]
 
 
 errorElementListing : PageProblems -> Html Msg
@@ -441,13 +562,6 @@ violationSummary violation =
                 [ text violation.failureSummary ]
             ]
         ]
-
-
-{-| Iconic externalLink SVG - licencse held by Matt Cheely
--}
-externalLink : String
-externalLink =
-    "\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' version='1.1' width='32' height='32' data-icon='external-link' viewBox='0 0 32 32'%3E%3Cpath fill='%23" ++ linkHex ++ "' d='M32 0l-8 1 2.438 2.438-9.5 9.5-1.063 1.063 2.125 2.125 1.063-1.063 9.5-9.5 2.438 2.438 1-8zm-30 3c-1.088 0-2 .912-2 2v25c0 1.088.912 2 2 2h25c1.088 0 2-.912 2-2v-15h-3v14h-23v-23h15v-3h-16z' /%3E%3C/svg%3E\""
 
 
 
