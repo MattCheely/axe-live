@@ -1,17 +1,22 @@
-import { filterSelectors } from "./exclusions.js";
-import { log } from "./logger.js";
+import { filterSelectors } from "./exclusions";
+import { log } from "./logger";
 
-let targetSelectors = [];
+let targetSelectors: Array<string> = [];
 let listenersCreated = false;
 
-export function interceptEvents(elementSelectors, onIntercepted) {
+type InterceptHandler = (selector: string) => void;
+
+export function interceptEvents(
+  elementSelectors: Array<string>,
+  onIntercepted: InterceptHandler
+) {
   targetSelectors = filterSelectors(elementSelectors);
   if (!listenersCreated) {
     createListeners(onIntercepted);
   }
 }
 
-function createListeners(onIntercepted) {
+function createListeners(onIntercepted: InterceptHandler) {
   const handler = eventHandler(onIntercepted);
   log("Watching for events on error elements");
   document.addEventListener("click", handler, { capture: true });
@@ -20,15 +25,21 @@ function createListeners(onIntercepted) {
   listenersCreated = true;
 }
 
-function eventHandler(onIntercepted) {
-  return event => {
-    let checkElement = event.target;
+function eventHandler(onIntercepted: InterceptHandler) {
+  return (event: Event) => {
+    let checkElement = event.target as HTMLElement | Document | null;
     log("Handling event on", checkElement);
     let matchedSelector = null;
-    while (!matchedSelector && checkElement && checkElement !== document) {
+
+    while (
+      !matchedSelector &&
+      checkElement !== null &&
+      !(checkElement instanceof Document)
+    ) {
       matchedSelector = matchSelector(targetSelectors, checkElement);
       checkElement = checkElement.parentElement;
     }
+
     if (matchedSelector) {
       event.preventDefault();
       event.stopPropagation();
@@ -37,7 +48,7 @@ function eventHandler(onIntercepted) {
   };
 }
 
-function matchSelector(selectors, element) {
+function matchSelector(selectors: Array<string>, element: HTMLElement) {
   return selectors.find(selector => {
     return element.matches(selector);
   });

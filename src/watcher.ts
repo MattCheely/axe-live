@@ -1,9 +1,9 @@
-import { log } from "./logger.js";
+import { log } from "./logger";
 
-const promise = null;
-const runAgain = false;
-
-export function watch(context, handler) {
+export function watch(
+  context: Node,
+  handler: (mutations: Array<MutationRecord>) => void
+) {
   const observer = new MutationObserver(mutations => {
     log("Watcher detected DOM mutations");
     handler(mutations);
@@ -15,8 +15,4 @@ export function watch(context, handler) {
     subtree: true
   });
   return observer;
-}
-
-function stop(observer) {
-  observer.disconnect();
 }

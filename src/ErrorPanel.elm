@@ -13,19 +13,15 @@ import Accessibility.Styled as Html
         , text
         , toUnstyled
         )
-import Accessibility.Styled.Style exposing (invisible)
 import Axe exposing (ElementProblem, PageProblems, problemsDecoder)
 import Browser
 import Css
     exposing
-        ( absolute
-        , auto
+        ( auto
         , backgroundColor
-        , backgroundImage
         , backgroundSize
         , borderBox
         , borderStyle
-        , bottom
         , boxSizing
         , color
         , column
@@ -37,7 +33,6 @@ import Css
         , fontSize
         , height
         , hex
-        , int
         , justifyContent
         , left
         , margin
@@ -50,18 +45,13 @@ import Css
         , padding
         , pct
         , pointer
-        , position
         , px
         , rgb
         , rgba
-        , right
         , sansSerif
         , textAlign
-        , top
         , transparent
-        , url
         , width
-        , zIndex
         )
 import Css.Global exposing (body, class, everything, global)
 import Dict
@@ -86,7 +76,6 @@ type alias A11yReport =
     { problems : PageProblems
     , selectedElement : Maybe String
     , checkOnChange : Bool
-    , popoutOpen : Bool
     , axeRunning : Bool
     , uncheckedChanges : List MutationRecord
     }
@@ -98,11 +87,23 @@ type alias MutationRecord =
     }
 
 
+type alias Flags =
+    { initialize : Bool
+    , state : A11yReport
+    }
+
+
 init : Value -> ( Model, Cmd Msg )
-init flags =
-    case decodeValue modelDecoder flags of
-        Ok model ->
-            ( Ok model, sendExternalState model )
+init flagsJson =
+    case decodeValue flagsDecoder flagsJson of
+        Ok flags ->
+            ( Ok flags.state
+            , if flags.initialize then
+                runInitialChecks
+
+              else
+                Cmd.none
+            )
 
         Err err ->
             ( Err ("I couldn't understand the output from axe. " ++ Decode.errorToString err)
@@ -110,23 +111,46 @@ init flags =
             )
 
 
+runInitialChecks : Cmd Msg
+runInitialChecks =
+    Ports.checkElements Encode.null
+
+
+flagsDecoder : Decoder Flags
+flagsDecoder =
+    Decode.map2 Flags
+        (Decode.field "initialize" Decode.bool)
+        (Decode.field "state" modelDecoder)
+
+
 modelDecoder : Decoder A11yReport
 modelDecoder =
-    Decode.map6 A11yReport
-        (Decode.field "problems" problemsDecoder)
-        (Decode.field "selectedElement" (Decode.nullable Decode.string))
+    Decode.map5 A11yReport
+        (Decode.oneOf
+            [ Decode.field "problems" problemsDecoder
+            , Decode.succeed Dict.empty
+            ]
+        )
+        (Decode.oneOf
+            [ Decode.field "selectedElement" (Decode.nullable Decode.string)
+            , Decode.succeed Nothing
+            ]
+        )
         (Decode.oneOf
             [ Decode.field "checkOnChange" Decode.bool
             , Decode.succeed True
             ]
         )
         (Decode.oneOf
-            [ Decode.field "popoutOpen" Decode.bool
+            [ Decode.field "axeRunning" Decode.bool
             , Decode.succeed False
             ]
         )
-        (Decode.field "axeRunning" Decode.bool)
-        (Decode.field "uncheckedChanges" (Decode.list mutationRecordDecoder))
+        (Decode.oneOf
+            [ Decode.field "uncheckedChanges" (Decode.list mutationRecordDecoder)
+            , Decode.succeed []
+            ]
+        )
 
 
 encodeModel : A11yReport -> Value
@@ -142,7 +166,6 @@ encodeModel model =
           , Dict.keys model.problems
                 |> Encode.list Encode.string
           )
-        , ( "popoutOpen", Encode.bool model.popoutOpen )
         , ( "axeRunning", Encode.bool model.axeRunning )
         , ( "uncheckedChanges", Encode.list mutationRecordEncoder model.uncheckedChanges )
         ]
@@ -182,7 +205,7 @@ type Msg
     = ElementSelected String
     | UnselectElement
     | PopOut
-    | PopIn
+    | PopIn A11yReport
     | ToggleCheckOnChange
     | DomChanged (List MutationRecord)
     | RunAxe
@@ -219,18 +242,10 @@ update msg model =
             Ok ( newModel, sendExternalState newModel )
 
         PopOut ->
-            let
-                newModel =
-                    { model | popoutOpen = True }
-            in
-            Ok ( newModel, sendExternalState newModel )
+            Ok ( model, popOut model )
 
-        PopIn ->
-            let
-                newModel =
-                    { model | popoutOpen = False }
-            in
-            Ok ( newModel, sendExternalState newModel )
+        PopIn currentState ->
+            Ok ( currentState, Cmd.none )
 
         ToggleCheckOnChange ->
             let
@@ -409,8 +424,7 @@ controlsView model =
         ]
         [ autoCheckControl model.checkOnChange
         , checkControl model.axeRunning
-        , popOutControl model.popoutOpen
-        , Debug.todo "Controls don't work in popout window"
+        , popOutControl
         ]
 
 
@@ -445,12 +459,14 @@ reportView model =
 autoCheckControl : Bool -> Html Msg
 autoCheckControl autoCheckOn =
     if autoCheckOn then
-        controlButton "Automatic checks enabled. Click to disable"
+        controlButton "disable-auto-check"
+            "Automatic checks enabled. Click to disable"
             Icon.eye
             ToggleCheckOnChange
 
     else
-        controlButton "Automatic checks disabled. Click to enable"
+        controlButton "enable-auto-check"
+            "Automatic checks disabled. Click to enable"
             Icon.eyeClosed
             ToggleCheckOnChange
 
@@ -458,29 +474,31 @@ autoCheckControl autoCheckOn =
 checkControl : Bool -> Html Msg
 checkControl axeRunning =
     if axeRunning then
-        controlButton "Accessibility checks are running"
+        controlButton "run-checks"
+            "Accessibility checks are running"
             (div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ])
             RunAxe
 
     else
-        controlButton "Run accessibility checks now"
+        controlButton "run-checks"
+            "Run accessibility checks now"
             Icon.loopCircular
             RunAxe
 
 
-popOutControl : Bool -> Html Msg
-popOutControl isExternal =
-    if not isExternal then
-        controlButton "Open in external window" Icon.externalLink PopOut
+popOutControl : Html Msg
+popOutControl =
+    controlButton "popout-button"
+        "Open in external window"
+        Icon.externalLink
+        PopOut
 
-    else
-        text ""
 
-
-controlButton : String -> Html Msg -> Msg -> Html Msg
-controlButton alt icon msg =
+controlButton : String -> String -> Html Msg -> Msg -> Html Msg
+controlButton idStr alt icon msg =
     button
-        [ title alt
+        [ id idStr
+        , title alt
         , css
             [ height (px 20)
             , width (px 20)
@@ -574,6 +592,12 @@ sendExternalState model =
         |> Ports.updateExternalState
 
 
+popOut : A11yReport -> Cmd msg
+popOut model =
+    encodeModel model
+        |> Ports.popOut
+
+
 a11yCheck : List MutationRecord -> PageProblems -> Cmd msg
 a11yCheck mutations problems =
     Encode.object
@@ -629,7 +653,6 @@ main =
                     [ Ports.elementSelected ElementSelected
                     , Ports.notifyChanges handleDomChanges
                     , Ports.violations handleViolationReport
-                    , Ports.popIn (always PopIn)
                     , Ports.axeRunning AxeRunning
                     ]
                 )
