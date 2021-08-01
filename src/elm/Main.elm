@@ -36,6 +36,7 @@ import Css
         , fontFamily
         , height
         , justifyContent
+        , margin
         , margin4
         , marginBottom
         , marginLeft
@@ -49,12 +50,13 @@ import Css
         , rgb
         , rgba
         , sansSerif
+        , spaceBetween
         , transparent
         , width
         )
 import Dict
 import Html.Styled.Attributes exposing (css, href, id, target, title)
-import Html.Styled.Events exposing (onClick)
+import Html.Styled.Events exposing (onBlur, onClick, onFocus, onMouseEnter, onMouseLeave)
 import Icon
 import Json.Decode as Decode exposing (Value, decodeValue)
 import Json.Encode as Encode
@@ -71,6 +73,7 @@ type alias Model =
     { interopError : Maybe String
     , a11yProblems : PageProblems
     , selectedElement : Maybe String
+    , focusedElement : Maybe String
     , checkOnChange : Bool
     , axeRunning : Bool
     , uncheckedChanges : List MutationRecord
@@ -91,13 +94,12 @@ withProblems problems model =
     { model | a11yProblems = problems, selectedElement = newSelection }
 
 
-selectedItemProblems : Model -> Maybe ( String, List ElementProblem )
+selectedItemProblems : Model -> Maybe (List ElementProblem)
 selectedItemProblems model =
     model.selectedElement
         |> Maybe.andThen
             (\selected ->
                 Dict.get selected model.a11yProblems
-                    |> Maybe.map (\problems -> ( selected, problems ))
             )
 
 
@@ -106,6 +108,7 @@ init _ =
     ( { interopError = Nothing
       , a11yProblems = Dict.empty
       , selectedElement = Nothing
+      , focusedElement = Nothing
       , checkOnChange = True
       , axeRunning = True
       , uncheckedChanges = []
@@ -129,6 +132,8 @@ type Msg
     | PopOutClicked
     | ToggleAutoCheckClicked
     | RunAxeClicked
+    | SelectorFocused String
+    | SelectorUnfocused
     | GotDomChanges (List MutationRecord)
     | GotViolations PageProblems
     | GotAxeRunning Bool
@@ -141,7 +146,10 @@ update msg model =
         ElementSelected selector ->
             let
                 newModel =
-                    { model | selectedElement = Just selector }
+                    { model
+                        | selectedElement = Just selector
+                        , focusedElement = Nothing
+                    }
             in
             ( newModel, sendExternalState newModel )
 
@@ -149,6 +157,20 @@ update msg model =
             let
                 newModel =
                     { model | selectedElement = Nothing }
+            in
+            ( newModel, sendExternalState newModel )
+
+        SelectorFocused selector ->
+            let
+                newModel =
+                    { model | focusedElement = Just selector }
+            in
+            ( newModel, sendExternalState newModel )
+
+        SelectorUnfocused ->
+            let
+                newModel =
+                    { model | focusedElement = Nothing }
             in
             ( newModel, sendExternalState newModel )
 
@@ -220,6 +242,10 @@ sendExternalState model =
           , Maybe.map Encode.string model.selectedElement
                 |> Maybe.withDefault Encode.null
           )
+        , ( "focusedElement"
+          , Maybe.map Encode.string model.focusedElement
+                |> Maybe.withDefault Encode.null
+          )
         , ( "problemElements"
           , Dict.keys model.a11yProblems
                 |> Encode.list Encode.string
@@ -285,18 +311,56 @@ view model =
         )
 
 
+titleView : Model -> Html Msg
+titleView model =
+    let
+        problemCount =
+            Dict.size model.a11yProblems
+
+        heading =
+            \content -> h2 [ css [ margin (px 0) ] ] [ text content ]
+    in
+    case model.selectedElement of
+        Just selector ->
+            div []
+                [ button [ linkStyle, onClick UnselectElementClicked ] [ text "< Back" ]
+                , h2 [ headerStyle ] [ text selector ]
+                ]
+
+        Nothing ->
+            if problemCount == 1 then
+                heading "1 element has issues"
+
+            else if problemCount > 1 then
+                heading (String.fromInt problemCount ++ " elements have issues")
+
+            else if not model.axeRunning then
+                heading "No problems found. Nice work!"
+
+            else
+                heading "Running Checks..."
+
+
 controlsView : Model -> Html Msg
 controlsView model =
     div
         [ css
             [ edgePadding
             , displayFlex
-            , justifyContent flexEnd
+            , justifyContent spaceBetween
             ]
         ]
-        [ autoCheckControl model.checkOnChange
-        , checkControl model
-        , popOutControl
+        [ titleView model
+        , div
+            [ css
+                [ displayFlex
+                , justifyContent flexEnd
+                ]
+            ]
+            [ autoCheckControl model.checkOnChange
+            , checkControl model
+            , popOutControl
+            ]
         ]
 
 
@@ -308,25 +372,17 @@ reportView model =
             , edgePadding
             ]
         ]
-        [ if Dict.size model.a11yProblems /= 0 then
-            problemsView model
+        [ if Dict.size model.a11yProblems > 0 then
+            case selectedItemProblems model of
+                Just violations ->
+                    div [] (List.map violationSummary violations)
 
-          else if not model.axeRunning then
-            h2 [] [ text "No problems found. Nice work!" ]
+                Nothing ->
+                    div [] (List.map elementSummary (Dict.toList model.a11yProblems))
 
           else
-            text "Running Checks..."
+            text ""
         ]
-
-
-problemsView : Model -> Html Msg
-problemsView model =
-    case selectedItemProblems model of
-        Just ( selector, violations ) ->
-            describeViolations selector violations
-
-        Nothing ->
-            errorElementListing model.a11yProblems
 
 
 autoCheckControl : Bool -> Html Msg
@@ -392,42 +448,18 @@ controlButton idStr alt icon msg =
         ]
 
 
-errorElementListing : PageProblems -> Html Msg
-errorElementListing elements =
-    let
-        count =
-            Dict.size elements
-
-        title =
-            if count > 1 then
-                String.fromInt count ++ " elements have issues"
-
-            else
-                "One element has issues"
-    in
-    div []
-        [ h2 [ headerStyle ] [ text title ]
-        , div [] (List.map elementSummary (Dict.toList elements))
-        ]
-
-
 elementSummary : ( String, List ElementProblem ) -> Html Msg
 elementSummary ( selector, violations ) =
     div []
         [ button
             [ elementListStyle
             , onClick (ElementSelected selector)
+            , onMouseEnter (SelectorFocused selector)
+            , onMouseLeave SelectorUnfocused
+            , onFocus (SelectorFocused selector)
+            , onBlur SelectorUnfocused
             ]
             [ text selector ]
-        ]
-
-
-describeViolations : String -> List ElementProblem -> Html Msg
-describeViolations selector violations =
-    div []
-        [ button [ linkStyle, onClick UnselectElementClicked ] [ text "< Back" ]
-        , h2 [ headerStyle ] [ text selector ]
-        , div [] (List.map violationSummary violations)
         ]
 
 

@@ -19,9 +19,9 @@ export interface CheckItems {
 }
 
 export interface AppState {
-  selectedElement: string;
+  selectedElement: string | null;
+  focusedElement: string | null;
   problemElements: Array<string>;
-  popoutOpen: boolean;
 }
 
 /**

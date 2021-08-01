@@ -8,8 +8,8 @@ const VIOLATION_HIGHLIGHT_STYLE = `
 const VIOLATION_SELECTED_STYLE = `
   {outline-style: solid !important; outline-width: 0.6rem !important; outline-offset: -0.3rem}
 `;
-const HIDDEN_FRAME_STYLE = `
-  {display: none}
+const VIOLATION_FOCUSED_STYLE = `
+  {outline-color: rgba(114, 195, 250, 0.7) !important; outline-style: solid !important}
 `;
 
 export function updateStyles(appState: AppState) {
@@ -22,16 +22,16 @@ export function updateStyles(appState: AppState) {
     clearSelected();
   }
 
+  if (appState.focusedElement && hasProblems) {
+    highlightFocused(appState.focusedElement);
+  } else {
+    clearFocused();
+  }
+
   if (hasProblems) {
     markViolations(flaggableProblems);
   } else {
     clearViolations();
-  }
-
-  if (!appState.popoutOpen && hasProblems) {
-    showFrame();
-  } else {
-    hideFrame();
   }
 }
 
@@ -54,14 +54,13 @@ function clearSelected() {
   highlightSelected(`#${STYLES_ID}`);
 }
 
-function hideFrame() {
+function highlightFocused(selector: string) {
   const styles = ensureStyleSheet();
-  (styles.rules[2] as CSSStyleRule).selectorText = `#${FRAME_ID}`;
+  (styles.rules[2] as CSSStyleRule).selectorText = selector;
 }
 
-function showFrame() {
-  const styles = ensureStyleSheet();
-  (styles.rules[2] as CSSStyleRule).selectorText = `#${STYLES_ID}`;
+function clearFocused() {
+  highlightFocused(`#${STYLES_ID}`);
 }
 
 function ensureStyleSheet(): CSSStyleSheet {
@@ -71,8 +70,8 @@ function ensureStyleSheet(): CSSStyleSheet {
     document.head.appendChild(styles);
     styles.id = STYLES_ID;
 
-    // rule 2 - frameHide - starts hidden
-    styles.sheet?.insertRule(`#${FRAME_ID} ${HIDDEN_FRAME_STYLE}`);
+    // rule 2 - focused
+    styles.sheet?.insertRule(`#${STYLES_ID} ${VIOLATION_FOCUSED_STYLE}`);
     // rule 1 - selection
     styles.sheet?.insertRule(`#${STYLES_ID} ${VIOLATION_SELECTED_STYLE}`);
     // rule 0 - highlight

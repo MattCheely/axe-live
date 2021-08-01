@@ -11,11 +11,7 @@
     "watch": "rollup -w -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "axe",
-    "a11y",
-    "accessibility"
-  ],
+  "keywords": ["axe", "a11y", "accessibility"],
   "author": "Matt Cheely",
   "repository": "https://github.com/MattCheely/axe-live.git",
   "license": "Apache-2.0",
@@ -31,7 +27,5 @@
     "typescript": "^4.3.5",
     "vite": "^2.3.7"
   },
-  "browserslist": [
-    "last 1 Chrome versions"
-  ]
+  "browserslist": ["defaults"]
 }
