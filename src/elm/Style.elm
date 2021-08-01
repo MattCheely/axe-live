@@ -1,4 +1,4 @@
-module Style exposing (colors, edgePadding, elementListStyle, global, headerStyle, linkStyle, spin, textStyle)
+module Style exposing (colors, edgePadding, elementButtonStyle, global, headerStyle, linkStyle, spin, textStyle)
 
 {-| Shared and global CSS styles, color primitives, and other bits of style
 that are more useful when centralized.
@@ -51,18 +51,25 @@ linkStyle =
         , fontSize (px 16)
         , cursor pointer
         , textAlign left
+        , hover
+            [ textDecoration underline
+            ]
         ]
 
 
-elementListStyle =
+elementButtonStyle =
     css
         [ backgroundColor transparent
+        , width (pct 100)
         , color colors.link
         , borderStyle none
         , fontSize (px 16)
         , cursor pointer
         , marginBottom (px 12)
         , textAlign left
+        , hover
+            [ textDecoration underline
+            ]
         ]
 
 

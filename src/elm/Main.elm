@@ -62,7 +62,7 @@ import Json.Decode as Decode exposing (Value, decodeValue)
 import Json.Encode as Encode
 import MutationRecord exposing (MutationRecord)
 import Ports
-import Style exposing (colors, edgePadding, elementListStyle, headerStyle, linkStyle, textStyle)
+import Style exposing (colors, edgePadding, elementButtonStyle, headerStyle, linkStyle, textStyle)
 
 
 
@@ -452,7 +452,7 @@ elementSummary : ( String, List ElementProblem ) -> Html Msg
 elementSummary ( selector, violations ) =
     div []
         [ button
-            [ elementListStyle
+            [ elementButtonStyle
             , onClick (ElementSelected selector)
             , onMouseEnter (SelectorFocused selector)
             , onMouseLeave SelectorUnfocused
