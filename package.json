@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.8",
   "description": "Show a11y audit results inline on pages",
-  "main": "src/axe-live.js",
+  "main": "src/ts/axe-live.js",
   "browser": "dist/axe-live.js",
   "scripts": {
     "start": "vite",

@@ -1,5 +1,9 @@
 module Icon exposing (externalLink, eye, eyeClosed, loopCircular)
 
+{-| These are icons from the iconic icon library, translated to elm for use in
+the project. License held by Matthew Cheely.
+-}
+
 import Accessibility.Styled as Html exposing (Html)
 import Html.Styled.Attributes exposing (attribute)
 import Svg.Styled as Svg exposing (..)

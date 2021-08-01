@@ -12,7 +12,7 @@ import Json.Encode exposing (Value)
 
 
 
--- inbound
+-- Inbound
 
 
 {-| notifies the main app of changes to the DOM
@@ -36,7 +36,7 @@ port elementSelected : (String -> msg) -> Sub msg
 
 
 
--- outbound
+-- Outbound
 
 
 {-| tells external JS to check elements for a11y violations
@@ -51,4 +51,4 @@ port updateExternalState : Value -> Cmd msg
 
 {-| tells externa JS to move the display to an external window
 -}
-port popOut : Value -> Cmd msg
+port popOut : () -> Cmd msg

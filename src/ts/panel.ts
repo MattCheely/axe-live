@@ -1,4 +1,4 @@
-import { default as Elm, Flags, App } from "./ErrorPanel.elm";
+import { default as Elm, Flags, App } from "../elm/Main.elm";
 import * as Axe from "axe-core";
 
 export const FRAME_ID = "axe-live-frame";
@@ -56,7 +56,7 @@ export class Panel {
     this.onExternalStateChange = options.onExternalStateChange;
     this.axeOptions = axeOptions;
 
-    this.createFramePanel({ initialize: true, state: {} }).then(panel => {
+    this.createFramePanel().then(panel => {
       this.panel = panel;
       this.setUpPanelSubscriptions(panel);
     });
@@ -93,13 +93,12 @@ export class Panel {
   /**
    * Initializes the panel in an embedded iframe
    */
-  private async createFramePanel(flags: Flags): Promise<App> {
+  private async createFramePanel(): Promise<App> {
     let win = getFrameWindow();
     await waitForLoad(win);
 
-    let app = Elm.ErrorPanel.init({
-      node: this.panelDiv,
-      flags: flags
+    let app = Elm.Main.init({
+      node: this.panelDiv
     });
 
     this.openFramePanel();

@@ -8,12 +8,12 @@ declare module "*.elm" {
     ports: any;
   }
 
-  export interface ErrorPanel {
-    init: ({ node: HTMLElement, flags: Flags }) => App;
+  export interface Main {
+    init: ({ node: HTMLElement }) => App;
   }
 
   const Elm: {
-    ErrorPanel: ErrorPanel;
+    Main: Main;
   };
 
   export default Elm;

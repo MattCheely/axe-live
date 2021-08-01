@@ -1,10 +1,18 @@
 module Axe exposing (ElementProblem, PageProblems, encodeProblems, problemsDecoder)
 
+{-| This module handles decoding the (rather complex) report data from axe, and
+turning it into a structure that's more suitable to our purposes. In particular,
+axe results are grouped by rule, with a list of elements that violate the rule,
+but we need results grouped by element, with a list of violates for that element.
+-}
+
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 
 
+{-| This is an a11y issue as used within the axe-live application
+-}
 type alias ElementProblem =
     { description : String
     , help : String
@@ -13,6 +21,8 @@ type alias ElementProblem =
     }
 
 
+{-| This dictionary maps individual CSS selectors to their a11y violations
+-}
 type alias PageProblems =
     Dict String (List ElementProblem)
 

@@ -2,7 +2,7 @@ import elm from "rollup-plugin-elm";
 import typescript from "@rollup/plugin-typescript";
 
 export default {
-  input: "src/axe-live.ts",
+  input: "src/ts/axe-live.ts",
   output: {
     file: "dist/axe-live.js",
     format: "es"
