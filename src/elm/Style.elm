@@ -26,7 +26,7 @@ global =
 
 
 linkHex =
-    "0077c8"
+    "72c3fa"
 
 
 colors =

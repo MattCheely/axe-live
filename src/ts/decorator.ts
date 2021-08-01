@@ -3,7 +3,7 @@ import { FRAME_ID, AppState } from "./panel";
 
 const STYLES_ID = "axe-live-styles";
 const VIOLATION_HIGHLIGHT_STYLE = `
-  {outline: rgba(255, 0, 0, 0.6) dashed 0.3rem !important; outline-offset: -0.15rem}
+  {outline: rgba(255, 0, 0, 0.7) dashed 0.3rem !important; outline-offset: -0.15rem}
 `;
 const VIOLATION_SELECTED_STYLE = `
   {outline-style: solid !important; outline-width: 0.6rem !important; outline-offset: -0.3rem}

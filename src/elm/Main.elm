@@ -295,7 +295,7 @@ controlsView model =
             ]
         ]
         [ autoCheckControl model.checkOnChange
-        , checkControl model.axeRunning
+        , checkControl model
         , popOutControl
         ]
 
@@ -333,30 +333,33 @@ autoCheckControl : Bool -> Html Msg
 autoCheckControl autoCheckOn =
     if autoCheckOn then
         controlButton "disable-auto-check"
-            "Automatic checks enabled. Click to disable"
+            "Automatic checks enabled. Click to disable."
             Icon.eye
             ToggleAutoCheckClicked
 
     else
         controlButton "enable-auto-check"
-            "Automatic checks disabled. Click to enable"
+            "Automatic checks disabled. Click to enable."
             Icon.eyeClosed
             ToggleAutoCheckClicked
 
 
-checkControl : Bool -> Html Msg
-checkControl axeRunning =
-    if axeRunning then
-        controlButton "run-checks"
-            "Accessibility checks are running"
-            (div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ])
-            RunAxeClicked
+checkControl : Model -> Html Msg
+checkControl model =
+    let
+        ( message, icon ) =
+            if model.axeRunning then
+                ( "Accessibility checks are running.", div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ] )
 
-    else
-        controlButton "run-checks"
-            "Run accessibility checks now"
-            Icon.loopCircular
-            RunAxeClicked
+            else if not (List.isEmpty model.uncheckedChanges) then
+                ( String.fromInt (List.length model.uncheckedChanges) ++ " unchecked changes. Click to check now."
+                , Icon.loopCircular
+                )
+
+            else
+                ( "Nothing to check.", Icon.check )
+    in
+    controlButton "run-checks" message icon RunAxeClicked
 
 
 popOutControl : Html Msg

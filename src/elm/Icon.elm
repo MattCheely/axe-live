@@ -1,4 +1,4 @@
-module Icon exposing (externalLink, eye, eyeClosed, loopCircular)
+module Icon exposing (check, externalLink, eye, eyeClosed, loopCircular)
 
 {-| These are icons from the iconic icon library, translated to elm for use in
 the project. License held by Matthew Cheely.
@@ -19,7 +19,7 @@ strokeLinecap =
 
 
 dataWidth =
-    attribute "data-width"
+    attribute "dataWidth"
 
 
 dataHeight =
@@ -27,7 +27,7 @@ dataHeight =
 
 
 dataIcon =
-    attribute "data-icon"
+    attribute "dataIcon"
 
 
 externalLink : Html msg
@@ -448,6 +448,40 @@ eyeClosed =
             , Svg.path
                 [ d "M0 14s6-10 16.125-10c1.523 0 2.953.239 4.284.641l-2.602 2.603c-.577-.154-1.181-.244-1.806-.244-3.866 0-7 3.134-7 7 0 .626.09 1.229.244 1.806l-4.016 4.016c-3.377-2.742-5.228-5.822-5.228-5.822zm26.791-5.842l-4.035 4.035c.154.577.244 1.181.244 1.806 0 3.866-3.134 7-7 7-.626 0-1.229-.09-1.806-.244l-2.567 2.567c1.391.424 2.893.677 4.499.677 9.875 0 15.875-10 15.875-10s-1.86-3.095-5.209-5.842z"
                 , class "iconic-eye-closed-eyeball iconic-property-fill"
+                ]
+                []
+            ]
+        ]
+
+
+check : Html msg
+check =
+    svg
+        [ version "1.1"
+        , width "100%"
+        , height "100%"
+        , dataIcon "check"
+        , class "iconic iconic-check iconic-size-md"
+        , viewBox "0 0 32 32"
+        ]
+        [ g
+            [ class "iconic-metadata"
+            ]
+            [ Svg.title [] []
+            ]
+        , g
+            [ class "iconic-container"
+            , dataWidth "32"
+            , dataHeight "27"
+            , transform "translate(0 2)"
+            ]
+            [ Svg.path
+                [ stroke "#000"
+                , strokeWidth "6"
+                , strokeLinecap "square"
+                , class "iconic-property-stroke"
+                , fill "none"
+                , d "M27.5 4.5l-16.5 17.5-6.5-6.5"
                 ]
                 []
             ]
