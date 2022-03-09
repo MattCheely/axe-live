@@ -2,11 +2,9 @@
   "name": "axe-live",
   "type": "module",
   "version": "0.1.0",
-  "description": "Show a11y audit results inline on pages",
-  "main": "src/ts/axe-live.js",
+  "description": "Highlight and summarize accessibility errors in running webappps",
   "browser": "dist/axe-live.js",
   "scripts": {
-    "start": "vite",
     "build": "rollup -c",
     "watch": "rollup -w -c",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -24,8 +22,7 @@
     "rollup": "^2.51.2",
     "rollup-plugin-elm": "^3.0.0",
     "tslib": "^2.3.0",
-    "typescript": "^4.3.5",
-    "vite": "^2.3.7"
+    "typescript": "^4.3.5"
   },
   "browserslist": ["defaults"]
 }
