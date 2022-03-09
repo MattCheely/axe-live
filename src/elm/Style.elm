@@ -1,4 +1,4 @@
-module Style exposing (colors, edgePadding, elementButtonStyle, global, headerStyle, linkStyle, spin, textStyle)
+module Style exposing (colors, edgePadding, elementButtonStyle, global, headerStyle, hiddenWhenMinimized, iconSize, linkStyle, spin, textStyle, visibleWhenMinimized)
 
 {-| Shared and global CSS styles, color primitives, and other bits of style
 that are more useful when centralized.
@@ -7,6 +7,7 @@ that are more useful when centralized.
 import Css exposing (..)
 import Css.Animations as Animations exposing (keyframes)
 import Css.Global as Global exposing (body, class, everything)
+import Css.Media as Media exposing (only, screen, withMedia)
 import Html.Styled exposing (Html)
 import Html.Styled.Attributes exposing (css)
 
@@ -25,13 +26,21 @@ global =
         ]
 
 
-linkHex =
-    "72c3fa"
+hiddenWhenMinimized =
+    withMedia [ only screen [ Media.maxWidth (px 300) ] ]
+        [ display none ]
+
+
+visibleWhenMinimized =
+    withMedia [ only screen [ Media.maxWidth (px 300) ] ]
+        [ display block ]
 
 
 colors =
     { text = rgb 255 255 255
-    , link = hex linkHex
+    , error = hex "fb595b"
+    , success = hex "62a37e"
+    , link = hex "72c3fa"
     }
 
 
@@ -89,8 +98,13 @@ spin duration =
     Css.batch
         [ animationName
             (keyframes
-                [ ( 100, [ Animations.transform [ rotate (deg -360) ] ] ) ]
+                [ ( 100, [ Animations.transform [ rotate (deg 360) ] ] ) ]
             )
         , animationDuration (sec duration)
         , Css.property "animation-iteration-count" "infinite"
+        , Css.property "animation-timing-function" "linear"
         ]
+
+
+iconSize =
+    Css.batch [ height (px 20), width (px 20) ]

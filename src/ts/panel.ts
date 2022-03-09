@@ -1,4 +1,4 @@
-import { default as Elm, Flags, App } from "../elm/Main.elm";
+import { default as Elm, App } from "../elm/Main.elm";
 import * as Axe from "axe-core";
 
 export const FRAME_ID = "axe-live-frame";
@@ -11,6 +11,17 @@ width: 80vw;
 height: 50vh;
 z-index: 9999999;
 border: none;
+border-radius: 5px 5px 0 0;
+`;
+
+const MINIMIZED_FRAME_STYLE = `
+position: fixed;
+width: 105px;
+height: 40px;
+bottom: 20px;
+right: 20px;
+border: none;
+border-radius: 5px;
 `;
 
 export interface CheckItems {
@@ -132,12 +143,28 @@ export class Panel {
       this.openExternalPanel();
     });
 
+    panel.ports.setMinimized.subscribe((shouldMinimize: boolean) => {
+      this.setMinimized(shouldMinimize);
+    });
+
     panel.ports.checkElements.subscribe((toCheck: any) => {
       this.onCheckElements(toCheck, this.axeOptions);
     });
     panel.ports.updateExternalState.subscribe((externalState: any) => {
       this.onExternalStateChange(externalState);
     });
+  }
+  
+  /**
+   * Sets the style to expand or collapse the frame
+   */ 
+  private setMinimized(minimized: boolean): void {
+    const frame = getFrame();
+    if(minimized) {
+      frame.setAttribute("style", MINIMIZED_FRAME_STYLE);
+    } else {
+      frame.setAttribute("style", FRAME_STYLE);
+    }
   }
 
   /**
@@ -204,15 +231,7 @@ function waitForLoad(win: Window): Promise<void> {
  * it does not exist.
  */
 function getFrameWindow(): Window {
-  let frame = <HTMLIFrameElement>document.getElementById(FRAME_ID);
-  if (frame === null) {
-    frame = <HTMLIFrameElement>document.createElement("iframe");
-    frame.setAttribute("id", FRAME_ID);
-    frame.setAttribute("role", "document");
-    frame.setAttribute("title", "Axe-Live Violations");
-    frame.setAttribute("style", FRAME_STYLE);
-    document.body.appendChild(frame);
-  }
+  let frame = getFrame();
 
   // Seems like overkill, but makes TS happy and it's better than a cast
   if (frame.contentWindow === null) {
@@ -220,4 +239,20 @@ function getFrameWindow(): Window {
   }
 
   return frame.contentWindow;
+}
+
+function getFrame(): HTMLIFrameElement {
+  let frame = <HTMLIFrameElement>document.getElementById(FRAME_ID);
+
+  if (frame === null) {
+    frame = <HTMLIFrameElement>document.createElement("iframe");
+    frame.setAttribute("id", FRAME_ID);
+    frame.setAttribute("role", "document");
+    frame.setAttribute("title", "Axe-Live Violations");
+    frame.setAttribute("style", FRAME_STYLE);
+
+    document.body.appendChild(frame);
+  }
+  
+  return frame
 }

@@ -25,23 +25,27 @@ import Css
     exposing
         ( auto
         , backgroundColor
-        , backgroundSize
         , borderStyle
         , color
         , column
         , cursor
+        , display
         , displayFlex
         , flexDirection
         , flexEnd
+        , flexGrow
         , fontFamily
         , height
         , justifyContent
+        , lineHeight
         , margin
         , margin4
         , marginBottom
         , marginLeft
+        , marginRight
         , marginTop
         , none
+        , num
         , overflow
         , padding
         , pct
@@ -52,7 +56,6 @@ import Css
         , sansSerif
         , spaceBetween
         , transparent
-        , width
         )
 import Dict
 import Html.Styled.Attributes exposing (css, href, id, target, title)
@@ -62,7 +65,7 @@ import Json.Decode as Decode exposing (Value, decodeValue)
 import Json.Encode as Encode
 import MutationRecord exposing (MutationRecord)
 import Ports
-import Style exposing (colors, edgePadding, elementButtonStyle, headerStyle, linkStyle, textStyle)
+import Style exposing (colors, edgePadding, elementButtonStyle, headerStyle, hiddenWhenMinimized, linkStyle, textStyle, visibleWhenMinimized)
 
 
 
@@ -132,6 +135,8 @@ type Msg
     | PopOutClicked
     | ToggleAutoCheckClicked
     | RunAxeClicked
+    | MinimizeClicked
+    | MaximizeClicked
     | SelectorFocused String
     | SelectorUnfocused
     | GotDomChanges (List MutationRecord)
@@ -176,6 +181,12 @@ update msg model =
 
         PopOutClicked ->
             ( model, popOut )
+
+        MinimizeClicked ->
+            ( model, Ports.setMinimized True )
+
+        MaximizeClicked ->
+            ( model, Ports.setMinimized False )
 
         ToggleAutoCheckClicked ->
             let
@@ -283,32 +294,47 @@ checkChanges mutations problems =
 view : Model -> Html Msg
 view model =
     div
-        [ id "axe-live-panel"
-        , css
-            [ displayFlex
-            , flexDirection column
-            , backgroundColor (rgba 0 0 0 0.85)
+        [ css
+            [ backgroundColor (rgba 0 0 0 0.85)
             , color colors.text
             , fontFamily sansSerif
-            , height (pct 100)
             ]
         ]
-        (Style.global
-            :: (case model.interopError of
-                    Nothing ->
-                        [ controlsView model, reportView model ]
+        [ div
+            [ id "minimized-controls"
+            , css
+                [ display none
+                , visibleWhenMinimized
+                , height (pct 100)
+                ]
+            ]
+            [ minimizedView model ]
+        , div
+            [ id "axe-live-panel"
+            , css
+                [ hiddenWhenMinimized
+                , displayFlex
+                , flexDirection column
+                , height (pct 100)
+                ]
+            ]
+            (Style.global
+                :: (case model.interopError of
+                        Nothing ->
+                            [ controlsView model, reportView model ]
 
-                    Just errMsg ->
-                        [ h2 [ headerStyle ] [ text "Oops, something went wrong" ]
-                        , div [ css [ color (rgb 255 0 0) ] ] [ text errMsg ]
-                        , div [ css [ marginTop (px 20) ] ]
-                            [ text "This is probably a bug in axe-live. Please check the issues on "
-                            , a [ linkStyle, href "https://github.com/MattCheely/axe-live/issues" ] [ text "GitHub" ]
-                            , text " to see if someone has already opened an issue. If not, please open a new one."
+                        Just errMsg ->
+                            [ h2 [ headerStyle ] [ text "Oops, something went wrong" ]
+                            , div [ css [ color (rgb 255 0 0) ] ] [ text errMsg ]
+                            , div [ css [ marginTop (px 20) ] ]
+                                [ text "This is probably a bug in axe-live. Please check the issues on "
+                                , a [ linkStyle, href "https://github.com/MattCheely/axe-live/issues" ] [ text "GitHub" ]
+                                , text " to see if someone has already opened an issue. If not, please open a new one."
+                                ]
                             ]
-                        ]
-               )
-        )
+                   )
+            )
+        ]
 
 
 titleView : Model -> Html Msg
@@ -360,6 +386,7 @@ controlsView model =
             [ autoCheckControl model.checkOnChange
             , checkControl model
             , popOutControl
+            , minimizeControl
             ]
         ]
 
@@ -385,6 +412,62 @@ reportView model =
         ]
 
 
+minimizedView : Model -> Html Msg
+minimizedView model =
+    let
+        problemCount =
+            Dict.size model.a11yProblems
+
+        countText =
+            if problemCount > 99 then
+                "99+"
+
+            else
+                problemCount
+                    |> String.fromInt
+    in
+    div
+        [ css
+            [ height (pct 100)
+            , padding (px 10)
+            , displayFlex
+            , justifyContent spaceBetween
+            ]
+        ]
+        [ if problemCount > 0 then
+            problemSummary countText
+
+          else
+            div [ css [ color Style.colors.success ] ]
+                [ inlineIcon Icon.check ]
+        , div []
+            [ controlButton "maximize"
+                "Expand error view."
+                Icon.maximize
+                MaximizeClicked
+            ]
+        ]
+
+
+problemSummary : String -> Html Msg
+problemSummary countText =
+    div
+        [ css
+            [ displayFlex
+            , color Style.colors.error
+            , lineHeight (px 20)
+            ]
+        ]
+        [ inlineIcon Icon.alert
+        , text countText
+        ]
+
+
+inlineIcon icon =
+    div [ css [ Style.iconSize, marginRight (px 5) ] ]
+        [ icon ]
+
+
 autoCheckControl : Bool -> Html Msg
 autoCheckControl autoCheckOn =
     if autoCheckOn then
@@ -405,7 +488,9 @@ checkControl model =
     let
         ( message, icon ) =
             if model.axeRunning then
-                ( "Accessibility checks are running.", div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ] )
+                ( "Accessibility checks are running."
+                , div [ css [ Style.spin 1 ] ] [ Icon.loopCircular ]
+                )
 
             else if not (List.isEmpty model.uncheckedChanges) then
                 ( String.fromInt (List.length model.uncheckedChanges) ++ " unchecked changes. Click to check now."
@@ -426,16 +511,22 @@ popOutControl =
         PopOutClicked
 
 
+minimizeControl : Html Msg
+minimizeControl =
+    controlButton "minimize-button"
+        "Minimize error display"
+        Icon.minimize
+        MinimizeClicked
+
+
 controlButton : String -> String -> Html Msg -> Msg -> Html Msg
 controlButton idStr alt icon msg =
     button
         [ id idStr
         , title alt
         , css
-            [ height (px 20)
-            , width (px 20)
+            [ Style.iconSize
             , backgroundColor transparent
-            , backgroundSize (pct 100)
             , color colors.link
             , borderStyle none
             , padding (px 0)

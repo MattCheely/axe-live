@@ -4,6 +4,7 @@ port module Ports exposing
     , elementSelected
     , notifyChanges
     , popOut
+    , setMinimized
     , updateExternalState
     , violations
     )
@@ -49,6 +50,11 @@ port checkElements : Value -> Cmd msg
 port updateExternalState : Value -> Cmd msg
 
 
-{-| tells externa JS to move the display to an external window
+{-| tells external JS to move the display to an external window
 -}
 port popOut : () -> Cmd msg
+
+
+{-| tells external JS to switch to the full error display
+-}
+port setMinimized : Bool -> Cmd msg

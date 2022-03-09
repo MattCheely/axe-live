@@ -35,7 +35,7 @@ import * as AxeLive from "axe-live";
 AxeLive.watch();
 ```
 
-Alternatively to just run checks one:
+Alternatively to just run checks once:
 
 ```javascript
 import * as AxeLive from "axe-live";
