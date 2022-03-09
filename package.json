@@ -6,10 +6,14 @@
   "browser": "dist/axe-live.js",
   "scripts": {
     "build": "rollup -c",
-    "watch": "rollup -w -c",
+    "start": "rollup -w -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["axe", "a11y", "accessibility"],
+  "keywords": [
+    "axe",
+    "a11y",
+    "accessibility"
+  ],
   "author": "Matt Cheely",
   "repository": "https://github.com/MattCheely/axe-live.git",
   "license": "Apache-2.0",
@@ -17,6 +21,8 @@
     "axe-core": "^4.2.2"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^21.0.2",
+    "@rollup/plugin-node-resolve": "^13.1.3",
     "@rollup/plugin-typescript": "^8.2.1",
     "elm": "^0.19.1-5",
     "rollup": "^2.51.2",
@@ -24,5 +30,7 @@
     "tslib": "^2.3.0",
     "typescript": "^4.3.5"
   },
-  "browserslist": ["defaults"]
+  "browserslist": [
+    "defaults"
+  ]
 }

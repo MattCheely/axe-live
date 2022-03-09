@@ -1,5 +1,7 @@
 import elm from "rollup-plugin-elm";
 import typescript from "@rollup/plugin-typescript";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
 
 export default {
   input: "src/ts/axe-live.ts",
@@ -12,6 +14,8 @@ export default {
       optimize: true,
       debug: false
     }),
-    typescript()
+    typescript(),
+    nodeResolve(),
+    commonjs()
   ]
 };
