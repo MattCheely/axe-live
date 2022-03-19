@@ -1,7 +1,6 @@
 declare module "*.elm" {
   export interface Flags {
-    initialize: boolean;
-    state: any;
+    checkOnChange: boolean;
   }
 
   export interface App {
@@ -9,7 +8,7 @@ declare module "*.elm" {
   }
 
   export interface Main {
-    init: ({ node: HTMLElement }) => App;
+    init: ({ node: HTMLElement, flags: Flags }) => App;
   }
 
   const Elm: {
