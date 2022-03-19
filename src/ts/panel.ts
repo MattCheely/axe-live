@@ -59,6 +59,8 @@ export class Panel {
   constructor(
     axeOptions: Axe.RunOptions,
     options: {
+      watch: boolean;
+      minimized: boolean;
       onCheckElements: CheckHandler;
       onExternalStateChange: StateHandler;
     }
@@ -67,7 +69,7 @@ export class Panel {
     this.onExternalStateChange = options.onExternalStateChange;
     this.axeOptions = axeOptions;
 
-    this.createFramePanel().then(panel => {
+    this.createFramePanel(options.minimized, options.watch).then(panel => {
       this.panel = panel;
       this.setUpPanelSubscriptions(panel);
     });
@@ -104,12 +106,13 @@ export class Panel {
   /**
    * Initializes the panel in an embedded iframe
    */
-  private async createFramePanel(): Promise<App> {
-    let win = getFrameWindow();
+  private async createFramePanel(minimized: boolean, watch: boolean): Promise<App> {
+    let win = getFrameWindow(minimized);
     await waitForLoad(win);
 
     let app = Elm.Main.init({
-      node: this.panelDiv
+      node: this.panelDiv,
+      flags: { checkOnChange: watch }
     });
 
     this.openFramePanel();
@@ -198,9 +201,11 @@ export class Panel {
     await waitForLoad(externalWindow);
     const externalDocument = externalWindow.document;
 
-    // Kludge to hide the popout interaction in the external window
+    // Kludge to hide the popout and minimize interaction in the external window
     const styles = externalDocument.createElement("style");
-    styles.innerHTML = "#popout-button { display: none; }";
+    styles.innerHTML = `
+      #popout-button, #minimize-button { display: none; }
+    `;
     externalDocument.head.appendChild(styles);
 
     externalDocument.body.appendChild(
@@ -230,8 +235,8 @@ function waitForLoad(win: Window): Promise<void> {
  * Gets the window associated with the embedded axe-live iframe, creating it if
  * it does not exist.
  */
-function getFrameWindow(): Window {
-  let frame = getFrame();
+function getFrameWindow(minimized: boolean = false): Window {
+  let frame = getFrame(minimized);
 
   // Seems like overkill, but makes TS happy and it's better than a cast
   if (frame.contentWindow === null) {
@@ -241,7 +246,7 @@ function getFrameWindow(): Window {
   return frame.contentWindow;
 }
 
-function getFrame(): HTMLIFrameElement {
+function getFrame(minimized: boolean = false): HTMLIFrameElement {
   let frame = <HTMLIFrameElement>document.getElementById(FRAME_ID);
 
   if (frame === null) {
@@ -249,7 +254,8 @@ function getFrame(): HTMLIFrameElement {
     frame.setAttribute("id", FRAME_ID);
     frame.setAttribute("role", "document");
     frame.setAttribute("title", "Axe-Live Violations");
-    frame.setAttribute("style", FRAME_STYLE);
+    const style = minimized ? MINIMIZED_FRAME_STYLE : FRAME_STYLE;
+    frame.setAttribute("style", style);
 
     document.body.appendChild(frame);
   }

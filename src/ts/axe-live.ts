@@ -5,26 +5,50 @@ import * as Watcher from "./watcher";
 import { Panel, CheckItems, AppState } from "./panel";
 import { log } from "./logger";
 
-export async function watch(
-  targetNode: Node = document,
-  axeOptions: Axe.RunOptions = {}
+export interface Options {
+  target: Node,
+  watch?: boolean,
+  minimized?: boolean  
+  axeOptions?: Axe.RunOptions
+}
+
+export interface FullOptions {
+  target: Node,
+  watch: boolean,
+  minimized: boolean,
+  axeOptions: {}
+}
+
+const defaultOptions: FullOptions = {
+  target: document,
+  watch: true,
+  minimized: false,
+  axeOptions: {}
+}
+
+export async function run(
+  options: Options = { target: document, axeOptions: {} },
 ) {
-  new AxeLiveState(targetNode, axeOptions);
+  const derivedOpts = Object.assign(defaultOptions, options);
+
+  new AxeLiveState(derivedOpts);
 }
 
 class AxeLiveState {
   private panel: Panel;
-  private targetNode: Node;
+  private options: FullOptions;
 
-  constructor(targetNode: Node, axeOptions: Axe.RunOptions) {
-    this.targetNode = targetNode;
+  constructor(options: FullOptions) {
+    this.options = options;
+    const axeOptions = options.axeOptions;
 
-    this.panel = new Panel(axeOptions, {
+    this.panel = new Panel(axeOptions, { 
+      ...options,
       onCheckElements: this.checkChangedElements.bind(this),
       onExternalStateChange: this.updateDisplayState.bind(this)
     });
 
-    Watcher.watch(targetNode, async mutations => {
+    Watcher.watch(options.target, async mutations => {
       this.panel.notifyChanges(mutations);
     });
   }
@@ -35,7 +59,7 @@ class AxeLiveState {
   ) {
     let elements = null;
     if (toCheck === null) {
-      elements = [this.targetNode];
+      elements = [this.options.target];
     } else {
       elements = toCheck.elements;
       if (toCheck.selectors.length > 0) {

@@ -33,7 +33,6 @@ import Css
         , displayFlex
         , flexDirection
         , flexEnd
-        , flexGrow
         , fontFamily
         , height
         , justifyContent
@@ -45,7 +44,6 @@ import Css
         , marginRight
         , marginTop
         , none
-        , num
         , overflow
         , padding
         , pct
@@ -106,13 +104,18 @@ selectedItemProblems model =
             )
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+type alias Flags =
+    { checkOnChange : Bool
+    }
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
     ( { interopError = Nothing
       , a11yProblems = Dict.empty
       , selectedElement = Nothing
       , focusedElement = Nothing
-      , checkOnChange = True
+      , checkOnChange = flags.checkOnChange
       , axeRunning = True
       , uncheckedChanges = []
       }
@@ -156,7 +159,12 @@ update msg model =
                         , focusedElement = Nothing
                     }
             in
-            ( newModel, sendExternalState newModel )
+            ( newModel
+            , Cmd.batch
+                [ sendExternalState newModel
+                , Ports.setMinimized False
+                ]
+            )
 
         UnselectElementClicked ->
             let
@@ -615,7 +623,7 @@ handleViolationReport violationJson =
 -- MAIN
 
 
-main : Program () Model Msg
+main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
