@@ -1,5 +1,6 @@
 import { default as Elm, App } from "../elm/Main.elm";
 import * as Axe from "axe-core";
+import { log } from "./logger";
 
 export const FRAME_ID = "axe-live-frame";
 const WINDOW_ID = "axe-live-window";
@@ -51,13 +52,11 @@ export class Panel {
   private panelDiv: HTMLElement = document.createElement("div");
   private onCheckElements: CheckHandler;
   private onExternalStateChange: StateHandler;
-  private axeOptions: Axe.RunOptions;
 
   /**
    * Creates a new panel
    */
   constructor(
-    axeOptions: Axe.RunOptions,
     options: {
       watch: boolean;
       minimized: boolean;
@@ -67,7 +66,6 @@ export class Panel {
   ) {
     this.onCheckElements = options.onCheckElements;
     this.onExternalStateChange = options.onExternalStateChange;
-    this.axeOptions = axeOptions;
 
     this.createFramePanel(options.minimized, options.watch).then(panel => {
       this.panel = panel;
@@ -92,15 +90,8 @@ export class Panel {
   /**
    * Notifies the panel that DOM changes have occured
    */
-  notifyChanges(changes: unknown): void {
+  notifyChanges(changes: Array<Node>): void {
     this.panel?.ports.notifyChanges.send(changes);
-  }
-
-  /**
-   * Lets the panel know that axe is currently running
-   */
-  axeRunning(isRunning: boolean): void {
-    this.panel?.ports.axeRunning.send(isRunning);
   }
 
   /**
@@ -110,6 +101,7 @@ export class Panel {
     let win = getFrameWindow(minimized);
     await waitForLoad(win);
 
+    log('Starting UI');
     let app = Elm.Main.init({
       node: this.panelDiv,
       flags: { checkOnChange: watch }
@@ -151,7 +143,7 @@ export class Panel {
     });
 
     panel.ports.checkElements.subscribe((toCheck: any) => {
-      this.onCheckElements(toCheck, this.axeOptions);
+      this.onCheckElements(toCheck);
     });
     panel.ports.updateExternalState.subscribe((externalState: any) => {
       this.onExternalStateChange(externalState);
