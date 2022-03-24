@@ -61,7 +61,6 @@ import Html.Styled.Events exposing (onBlur, onClick, onFocus, onMouseEnter, onMo
 import Icon
 import Json.Decode as Decode exposing (Value, decodeValue)
 import Json.Encode as Encode
-import MutationRecord exposing (MutationRecord)
 import Ports
 import Style exposing (colors, edgePadding, elementButtonStyle, headerStyle, hiddenWhenMinimized, linkStyle, textStyle, visibleWhenMinimized)
 
@@ -77,7 +76,7 @@ type alias Model =
     , focusedElement : Maybe String
     , checkOnChange : Bool
     , axeRunning : Bool
-    , uncheckedChanges : List MutationRecord
+    , uncheckedChanges : List Value
     }
 
 
@@ -142,9 +141,8 @@ type Msg
     | MaximizeClicked
     | SelectorFocused String
     | SelectorUnfocused
-    | GotDomChanges (List MutationRecord)
+    | GotDomChanges (List Value)
     | GotViolations PageProblems
-    | GotAxeRunning Bool
     | ErrorEncountered String
 
 
@@ -221,14 +219,11 @@ update msg model =
         RunAxeClicked ->
             runChecksIfNeeded model
 
-        GotAxeRunning axeRunning ->
-            { model | axeRunning = axeRunning }
-                |> runChecksIfNeeded
-
         GotViolations problems ->
             let
                 newModel =
-                    model |> withProblems problems
+                    { model | axeRunning = False }
+                        |> withProblems problems
             in
             ( newModel, sendExternalState newModel )
 
@@ -244,7 +239,10 @@ we get violations.
 runChecksIfNeeded : Model -> ( Model, Cmd msg )
 runChecksIfNeeded model =
     if model.axeRunning == False && not (List.isEmpty model.uncheckedChanges) then
-        ( { model | uncheckedChanges = [] }
+        ( { model
+            | uncheckedChanges = []
+            , axeRunning = True
+          }
         , checkChanges model.uncheckedChanges model.a11yProblems
         )
 
@@ -282,11 +280,11 @@ popOut =
 
 {-| Tell JS to run axe against elements that need to be checked
 -}
-checkChanges : List MutationRecord -> PageProblems -> Cmd msg
-checkChanges mutations problems =
+checkChanges : List Value -> PageProblems -> Cmd msg
+checkChanges nodes problems =
     Encode.object
         -- On a DOM change, check all the elements that changed for issues
-        [ ( "elements", Encode.list identity (List.map .target mutations) )
+        [ ( "elements", Encode.list identity nodes )
 
         -- Also check all the elements that currently have problems,
         -- in case the changes fixed them
@@ -580,7 +578,7 @@ violationSummary violation =
                 , href violation.helpUrl
                 , target "blank"
                 ]
-                [ text "learn more.." ]
+                [ text "learn more..." ]
             ]
         , div [ css [ marginLeft (px 16) ] ]
             [ Html.pre [ textStyle ]
@@ -594,14 +592,14 @@ violationSummary violation =
 
 
 handleDomChanges : Value -> Msg
-handleDomChanges mutationInfo =
-    case Decode.decodeValue (Decode.list MutationRecord.decoder) mutationInfo of
-        Ok mutationRecords ->
-            GotDomChanges mutationRecords
+handleDomChanges nodeList =
+    case Decode.decodeValue (Decode.list Decode.value) nodeList of
+        Ok nodes ->
+            GotDomChanges nodes
 
         Err decodeError ->
             ErrorEncountered
-                ("I could not parse a DOM mutation event. "
+                ("I could not parse a DOM change message. "
                     ++ Decode.errorToString decodeError
                 )
 
@@ -635,7 +633,6 @@ main =
                     [ Ports.elementSelected ElementSelected
                     , Ports.notifyChanges handleDomChanges
                     , Ports.violations handleViolationReport
-                    , Ports.axeRunning GotAxeRunning
                     ]
                 )
         }

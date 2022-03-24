@@ -40,23 +40,19 @@ class AxeLiveState {
 
   constructor(options: FullOptions) {
     this.options = options;
-    const axeOptions = options.axeOptions;
 
-    this.panel = new Panel(axeOptions, { 
+    this.panel = new Panel({ 
       ...options,
       onCheckElements: this.checkChangedElements.bind(this),
       onExternalStateChange: this.updateDisplayState.bind(this)
     });
 
-    Watcher.watch(options.target, async mutations => {
-      this.panel.notifyChanges(mutations);
+    Watcher.watch(options.target, async changedNodes => {
+      this.panel.notifyChanges(changedNodes);
     });
   }
 
-  async checkChangedElements(
-    toCheck: CheckItems | null,
-    axeOptions: Axe.RunOptions
-  ) {
+  async checkChangedElements(toCheck: CheckItems | null) {
     let elements = null;
     if (toCheck === null) {
       elements = [this.options.target];
@@ -70,11 +66,12 @@ class AxeLiveState {
       }
     }
 
-    let results = await this.reCheck(elements, axeOptions);
+    let results = await this.reCheck(elements);
     this.panel.reportViolations(results.violations);
   }
 
   updateDisplayState(appState: AppState) {
+    log(`Errors found in ${appState.problemElements.length} elements`, appState.problemElements.sort());
     Decorator.updateStyles(appState);
     EventBlocker.interceptEvents(
       appState.problemElements,
@@ -84,13 +81,11 @@ class AxeLiveState {
     );
   }
 
-  private async reCheck(elements: Array<Node>, axeOptions: Axe.RunOptions) {
-    this.panel.axeRunning(true);
-
-    let ourOpts: Axe.RunOptions = { ...axeOptions, reporter: "v1" };
+  private async reCheck(elements: Array<Node>) {
+    let ourOpts: Axe.RunOptions = { ...this.options.axeOptions, reporter: "v1" };
     let result = null;
     if (elements) {
-      log(`a11y check starting for ${elements.length} items`);
+      log(`a11y check starting for ${elements.length} items`, elements);
       // @ts-ignore - I don't like ts-ignore, but the axe docs explicitly say it accepts a NodeList
       // as context, but the type definition doesn't include that
       result = await Axe.run(elements, ourOpts);
@@ -99,8 +94,6 @@ class AxeLiveState {
       result = await Axe.run(ourOpts);
     }
     log("a11y check completed");
-
-    this.panel.axeRunning(false);
     return result;
   }
 }
