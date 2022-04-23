@@ -71,7 +71,7 @@ class AxeLiveState {
   }
 
   updateDisplayState(appState: AppState) {
-    log(`Errors found in ${appState.problemElements.length} elements`, appState.problemElements.sort());
+    log(`Highlighiting errors for ${appState.problemElements.length} elements`, appState.problemElements.sort());
     Decorator.updateStyles(appState);
     EventBlocker.interceptEvents(
       appState.problemElements,

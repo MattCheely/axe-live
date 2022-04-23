@@ -221,11 +221,12 @@ update msg model =
 
         GotViolations problems ->
             let
-                newModel =
+                ( newModel, checkCmd ) =
                     { model | axeRunning = False }
                         |> withProblems problems
+                        |> runChecksIfNeeded
             in
-            ( newModel, sendExternalState newModel )
+            ( newModel, Cmd.batch [ checkCmd, sendExternalState newModel ] )
 
         ErrorEncountered error ->
             ( { model | interopError = Just error }, Cmd.none )
