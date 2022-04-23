@@ -412,11 +412,25 @@ reportView model =
                     div [] (List.map violationSummary violations)
 
                 Nothing ->
-                    div [] (List.map elementSummary (Dict.toList model.a11yProblems))
+                    div []
+                        (Dict.toList model.a11yProblems
+                            |> List.sortWith shorterKey
+                            |> List.map elementSummary
+                        )
 
           else
             text ""
         ]
+
+
+shorterKey : ( String, a ) -> ( String, a ) -> Order
+shorterKey ( sel1, _ ) ( sel2, _ ) =
+    case compare (String.length sel1) (String.length sel2) of
+        EQ ->
+            compare sel1 sel2
+
+        val ->
+            val
 
 
 minimizedView : Model -> Html Msg
