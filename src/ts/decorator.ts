@@ -12,6 +12,37 @@ const VIOLATION_FOCUSED_STYLE = `
   {outline-color: rgba(114, 195, 250, 0.7) !important; outline-style: solid !important}
 `;
 
+const FRAME_STYLE = `
+position: fixed;
+bottom: 0;
+left: 10vw;
+width: 80vw;
+height: 50vh;
+z-index: 9999999;
+border: none;
+border-radius: 5px 5px 0 0;
+`;
+
+const MINIMIZED_FRAME_STYLE = `
+position: fixed;
+width: 105px;
+height: 40px;
+bottom: 20px;
+right: 20px;
+border: none;
+border-radius: 5px;
+`;
+
+export function minimizeFrame() {
+  const styles = ensureStyleSheet();
+  (styles.rules[3] as CSSStyleRule).style.cssText = MINIMIZED_FRAME_STYLE;
+}
+
+export function expandFrame() {
+  const styles = ensureStyleSheet();
+  (styles.rules[3] as CSSStyleRule).style.cssText = FRAME_STYLE;
+}
+
 export function updateStyles(appState: AppState) {
   const hasProblems = appState.problemElements.length > 0;
   const flaggableProblems = filterSelectors(appState.problemElements);
@@ -69,7 +100,9 @@ function ensureStyleSheet(): CSSStyleSheet {
     styles = <HTMLStyleElement>document.createElement("style");
     document.head.appendChild(styles);
     styles.id = STYLES_ID;
-
+    
+    // rule 3 - iframe
+    styles.sheet?.insertRule(`#${FRAME_ID} {${FRAME_STYLE}}`)
     // rule 2 - focused
     styles.sheet?.insertRule(`#${STYLES_ID} ${VIOLATION_FOCUSED_STYLE}`);
     // rule 1 - selection
