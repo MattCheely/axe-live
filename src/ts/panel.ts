@@ -1,29 +1,9 @@
 import { default as Elm, App } from "../elm/Main.elm";
-import * as Axe from "axe-core";
 import { log } from "./logger";
+import { minimizeFrame, expandFrame } from "./decorator";
 
 export const FRAME_ID = "axe-live-frame";
 const WINDOW_ID = "axe-live-window";
-const FRAME_STYLE = `
-position: fixed;
-bottom: 0;
-left: 10vw;
-width: 80vw;
-height: 50vh;
-z-index: 9999999;
-border: none;
-border-radius: 5px 5px 0 0;
-`;
-
-const MINIMIZED_FRAME_STYLE = `
-position: fixed;
-width: 105px;
-height: 40px;
-bottom: 20px;
-right: 20px;
-border: none;
-border-radius: 5px;
-`;
 
 export interface CheckItems {
   elements: Array<Element>;
@@ -40,10 +20,7 @@ export interface AppState {
  * Handler for the application requesting a11y checks. If the items to be checked are null, the
  * entire context should be checked.
  */
-type CheckHandler = (
-  items: CheckItems | null,
-  axeOptions: Axe.RunOptions
-) => void;
+type CheckHandler = (items: CheckItems | null) => void;
 
 type StateHandler = (data: AppState) => void;
 
@@ -66,8 +43,9 @@ export class Panel {
   ) {
     this.onCheckElements = options.onCheckElements;
     this.onExternalStateChange = options.onExternalStateChange;
+    this.setMinimized(options.minimized);
 
-    this.createFramePanel(options.minimized, options.watch).then(panel => {
+    this.createFramePanel(options.watch).then(panel => {
       this.panel = panel;
       this.setUpPanelSubscriptions(panel);
     });
@@ -97,8 +75,8 @@ export class Panel {
   /**
    * Initializes the panel in an embedded iframe
    */
-  private async createFramePanel(minimized: boolean, watch: boolean): Promise<App> {
-    let win = getFrameWindow(minimized);
+  private async createFramePanel(watch: boolean): Promise<App> {
+    let win = getFrameWindow();
     await waitForLoad(win);
 
     log('Starting UI');
@@ -154,11 +132,10 @@ export class Panel {
    * Sets the style to expand or collapse the frame
    */ 
   private setMinimized(minimized: boolean): void {
-    const frame = getFrame();
     if(minimized) {
-      frame.setAttribute("style", MINIMIZED_FRAME_STYLE);
+      minimizeFrame();
     } else {
-      frame.setAttribute("style", FRAME_STYLE);
+      expandFrame();
     }
   }
 
@@ -227,8 +204,8 @@ function waitForLoad(win: Window): Promise<void> {
  * Gets the window associated with the embedded axe-live iframe, creating it if
  * it does not exist.
  */
-function getFrameWindow(minimized: boolean = false): Window {
-  let frame = getFrame(minimized);
+function getFrameWindow(): Window {
+  let frame = getFrame();
 
   // Seems like overkill, but makes TS happy and it's better than a cast
   if (frame.contentWindow === null) {
@@ -238,7 +215,7 @@ function getFrameWindow(minimized: boolean = false): Window {
   return frame.contentWindow;
 }
 
-function getFrame(minimized: boolean = false): HTMLIFrameElement {
+function getFrame(): HTMLIFrameElement {
   let frame = <HTMLIFrameElement>document.getElementById(FRAME_ID);
 
   if (frame === null) {
@@ -246,8 +223,6 @@ function getFrame(minimized: boolean = false): HTMLIFrameElement {
     frame.setAttribute("id", FRAME_ID);
     frame.setAttribute("role", "document");
     frame.setAttribute("title", "Axe-Live Violations");
-    const style = minimized ? MINIMIZED_FRAME_STYLE : FRAME_STYLE;
-    frame.setAttribute("style", style);
 
     document.body.appendChild(frame);
   }
