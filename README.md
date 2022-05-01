@@ -70,7 +70,7 @@ for your app.
 On DOM changes, the watcher is conservative in what it asks Axe to check. Specifically, it only checks changed
 elements and elements that were previously in error. This is to make checks faster, but it may result in a rare
 miss in the event of a change that renders a previously valid elment invalid. (e.g. a label disappears, making
-an previously correct input invalid)
+a previously correct input invalid)
 
 Because items in error are re-checked when the DOM changes, it's a good idea to fix any problems that affect
 large ancestor elements first. If your `html` or `body` elements have a problem, sort those out first so every
