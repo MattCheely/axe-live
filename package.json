@@ -1,7 +1,7 @@
 {
   "name": "axe-live",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Highlight and summarize accessibility errors in running webappps",
   "browser": "dist/axe-live.js",
   "types": "dist/axe-live.d.ts",
