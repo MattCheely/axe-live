@@ -1,9 +1,7 @@
 import { default as Elm, App } from "../elm/Main.elm";
 import { log } from "./logger";
 import { minimizeFrame, expandFrame } from "./decorator";
-
-export const FRAME_ID = "axe-live-frame";
-const WINDOW_ID = "axe-live-window";
+import { FRAME_ID, WINDOW_ID } from "./identifiers";
 
 export interface CheckItems {
   elements: Array<Element>;

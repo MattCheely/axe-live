@@ -1,4 +1,4 @@
-import { FRAME_ID } from "./panel";
+import { FRAME_ID } from "./identifiers";
 
 export function filterSelectors(selectors: Array<string>) {
   return selectors.filter(selector => {

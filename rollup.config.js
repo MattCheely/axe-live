@@ -17,7 +17,7 @@ export default {
       optimize: true,
       debug: true
     }),
-    typescript(),
+    typescript({ tsconfig: './tsconfig.json' }),
     nodeResolve(),
     commonjs(),
     replace({

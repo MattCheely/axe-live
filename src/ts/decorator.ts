@@ -1,7 +1,7 @@
 import { filterSelectors } from "./exclusions";
-import { FRAME_ID, AppState } from "./panel";
+import { FRAME_ID, STYLES_ID } from "./identifiers";
+import { AppState } from "./panel";
 
-const STYLES_ID = "axe-live-styles";
 const VIOLATION_HIGHLIGHT_STYLE = `
   {outline: rgba(255, 0, 0, 0.7) dashed 0.3rem !important; outline-offset: -0.15rem}
 `;

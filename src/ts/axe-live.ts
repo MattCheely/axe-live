@@ -6,7 +6,7 @@ import { Panel, CheckItems, AppState } from "./panel";
 import { log } from "./logger";
 
 export interface Options {
-  target: Node,
+  target?: Node,
   watch?: boolean,
   minimized?: boolean  
   axeOptions?: Axe.RunOptions

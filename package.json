@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Highlight and summarize accessibility errors in running webappps",
   "browser": "dist/axe-live.js",
+  "types": "dist/axe-live.d.ts",
   "scripts": {
     "build": "rollup -c",
     "start": "rollup -w -c",
